@@ -1,7 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from core.security import get_current_user
 
 
-host = APIRouter(tags=["主机相关"])
+host = APIRouter(tags=["主机相关"], dependencies=[Depends(get_current_user)])
 
 
 @host.get("/host", summary="主机信息")

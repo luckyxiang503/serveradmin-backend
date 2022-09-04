@@ -14,7 +14,7 @@ user = APIRouter(tags=['用户相关'], dependencies=[Depends(get_current_user)]
 async def get_user_info(username: str):
     db_user = get_user_by_name(username=username)
     if db_user is None:
-        raise HTTPException(status_code=400, detail="用户不存在")
+        raise HTTPException(status_code=404, detail="用户不存在")
     return Response200(data=db_user, msg="用户信息查询成功")
 
 
@@ -22,7 +22,7 @@ async def get_user_info(username: str):
 async def read_users(skip: int = 0, limit: int = 10):
     users = get_users(skip=skip, limit=limit)
     if users is None:
-        raise HTTPException(status_code=400, detail="用户不存在")
+        raise HTTPException(status_code=404, detail="用户不存在")
     return users
 
 
