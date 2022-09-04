@@ -1,12 +1,6 @@
-'''
-    @Project   : ServerAdmin
-    @Author    : xiang
-    @CreateTime: 2022/8/29 10:56
-'''
 from db import models
 from db.database import SessionLocal
-from .schemas import User
-from .security import get_hash_password
+from schemas.user import User
 
 
 def get_user_by_name(username: str):
@@ -28,7 +22,6 @@ def create_user(user: User):
     :param user: 用户信息
     :return: 数据库存入信息
     """
-    user.password = get_hash_password(user.password)
     db_user = models.User(**user.dict())
     with SessionLocal() as db:
         db.add(db_user)
@@ -46,5 +39,5 @@ def get_users(skip: int = 0, limit: int = 100):
     :return: 用户列表
     """
     with SessionLocal() as db:
-        db_users = db.query(models.User).offset(skip).limit(limit).all()
-    return db_users
+        users = db.query(models.User).offset(skip).limit(limit).all()
+    return users

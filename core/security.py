@@ -1,21 +1,18 @@
-'''
-    @Project   : ServerAdmin
-    @Author    : xiang
-    @CreateTime: 2022/9/2 11:12
-'''
 from datetime import datetime, timedelta
-from jose import jwt
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt, JWTError
 from typing import Optional
+from fastapi import HTTPException, Depends
 from passlib.context import CryptContext
-import secrets
-from fastapi import Header, HTTPException
-from pydantic import ValidationError
 from starlette import status
 
+from core.config import settings
+from db.crud import get_user_by_name
+
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-SECRET_KEY = secrets.token_urlsafe(32)
-ALGORITHM = "HS256"
 
 def get_hash_password(password: str):
     """
@@ -25,6 +22,7 @@ def get_hash_password(password: str):
     """
     return pwd_context.hash(password)
 
+
 def verify_password(plain_password, hashed_password):
     """
     校验接收的密码是否与存储的哈希值匹配
@@ -33,6 +31,7 @@ def verify_password(plain_password, hashed_password):
     :return: 返回值为bool类型，校验成功返回True,反之False
     """
     return pwd_context.verify(plain_password, hashed_password)
+
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """
@@ -50,27 +49,31 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode.update({"exp": expire})
     # SECRET_KEY：密钥
     # ALGORITHM：JWT令牌签名算法
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
-def check_jwt_token(token: Optional[str] = Header("")):
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
     """
-    验证token
-    :param token:
-    :return: 返回用户信息
+    # oauth2_scheme -> 从请求头中取到 Authorization 的value
+    解析token 获取当前用户对象
+    :param token: 登录之后获取到的token
+    :return: 当前用户对象
     """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         username: str = payload.get("sub")
-        # 通过解析得到的username,获取用户信息,并返回
-        return username
-    except (jwt.JWTError, jwt.ExpiredSignatureError, ValidationError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                'code': 5000,
-                'message': "Token Error",
-                'data': "Token Error",
-            }
-        )
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    db_user = get_user_by_name(username)
+    if db_user is None:
+        raise credentials_exception
+    return db_user
 

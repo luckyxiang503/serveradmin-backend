@@ -1,16 +1,15 @@
-'''
-    @Project   : ServerAdmin
-    @Author    : xiang
-    @CreateTime: 2022/8/29 15:22
-'''
 from fastapi import APIRouter, FastAPI
 
 from .user import user
+from .login import login
+from .host import host
 from db.database import engine, Base
 
 api = APIRouter()
 
-api.include_router(user, prefix='/user')
+api.include_router(login)
+api.include_router(user)
+api.include_router(host)
 
 app = FastAPI()
 app.include_router(api, prefix='/api')

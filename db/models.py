@@ -1,11 +1,6 @@
-'''
-    @Project   : ServerAdmin
-    @Author    : xiang
-    @CreateTime: 2022/8/29 10:56
-'''
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime
 
-from .database import Base
+from db.database import Base
 
 class User(Base):
     __tablename__ = "users"
