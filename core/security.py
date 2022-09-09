@@ -7,7 +7,7 @@ from passlib.context import CryptContext
 from starlette import status
 
 from core.config import settings
-from db.crud import get_user_by_name
+from crud.user import get_user_by_name
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
@@ -44,7 +44,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=30)
+        expire = datetime.utcnow() + timedelta(days=1)
     # 添加失效时间
     to_encode.update({"exp": expire})
     # SECRET_KEY：密钥

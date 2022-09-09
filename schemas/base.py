@@ -19,8 +19,8 @@ class Response200(ResponseBasic):
     pass
 
 
-class ResponseToken(Response200):
-    access_token: str
+class ResponseToken(BaseModel):
+    token: str
     token_type: str = Field(default="bearer")
 
 

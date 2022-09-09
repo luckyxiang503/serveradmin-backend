@@ -14,8 +14,4 @@ class User(UserBase):
     password: str
 
 
-class TokenModel(UserBase):
-    token: str
-
-
 

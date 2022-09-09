@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 
-from db.crud import get_user_by_name
-from core.security import verify_password, create_access_token
+from crud.user import get_user_by_name
+from core.security import verify_password, create_access_token, get_current_user
 from schemas.base import ResponseToken
+from schemas.user import UserBase
 
 login = APIRouter(tags=["认证相关"])
 
@@ -15,7 +16,7 @@ async def user_login(form_data: OAuth2PasswordRequestForm = Depends()):
         raise HTTPException(status_code=404, detail="用户不存在")
     if verify_password(form_data.password, db_user.password):
         token = create_access_token(data={"sub": db_user.username})
-        return ResponseToken(data={"token": f"bearer {token}"}, access_token=token)
+        return ResponseToken(token=f"bearer {token}")
     else:
         raise HTTPException(status_code=400, detail="密码错误")
 
@@ -23,3 +24,8 @@ async def user_login(form_data: OAuth2PasswordRequestForm = Depends()):
 @login.put("/logout", summary="注销")
 async def user_logout():
     pass
+
+
+@login.get("/userinfo", summary='登录用户信息', response_model=UserBase)
+async def get_user_info(user: UserBase = Depends(get_current_user)):
+    return user
