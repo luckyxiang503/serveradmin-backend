@@ -59,6 +59,15 @@ def get_users(skip: int = 0, limit: int = 100):
         users = db.query(models.User).offset(skip).limit(limit).all()
     return users
 
+def get_all_users():
+    """
+    批量获取用户信息
+    :param db:
+    :return: 用户列表
+    """
+    with SessionLocal() as db:
+        users = db.query(models.User).all()
+    return users
 
 def delete_user(username: str):
     """

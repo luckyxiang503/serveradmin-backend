@@ -1,7 +1,7 @@
 from typing import List
 from fastapi import HTTPException, APIRouter, Depends
 
-from crud.user import get_user_by_name, create_user, get_users, delete_user, update_user
+from crud.user import get_user_by_name, create_user, get_users, delete_user, update_user, get_all_users
 from schemas.user import User, UserBase
 from schemas.base import Response200
 from core.security import get_hash_password, get_current_user
@@ -21,6 +21,13 @@ async def get_user_info(username: str):
 @user.get("/users", response_model=List[UserBase], summary='用户列表',)
 async def read_users(skip: int = 0, limit: int = 10):
     users = get_users(skip=skip, limit=limit)
+    if users is None:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    return users
+
+@user.get("/alluser", response_model=List[UserBase], summary='所有用户',)
+async def get_all_user():
+    users = get_all_users()
     if users is None:
         raise HTTPException(status_code=404, detail="用户不存在")
     return users

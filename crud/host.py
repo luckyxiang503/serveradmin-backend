@@ -27,6 +27,17 @@ def get_hosts(skip: int = 0, limit: int = 100):
     return hosts
 
 
+def get_all_hosts():
+    """
+    批量获取用户信息
+    :param db:
+    :return: 主机列表
+    """
+    with SessionLocal() as db:
+        hosts = db.query(models.Host).order_by(models.Host.host).all()
+    return hosts
+
+
 def add_host(host: Host):
     """
     添加主机
@@ -35,11 +46,18 @@ def add_host(host: Host):
     :return: 数据库存入信息
     """
     db_host = models.Host(**host.dict())
-    with SessionLocal() as db:
-        db.add(db_host)
-        db.commit()
-        db.refresh(db_host)
-    return db_host
+    try:
+        with SessionLocal() as db:
+            db.add(db_host)
+            db.commit()
+            db.refresh(db_host)
+            return True
+    except Exception as e:
+        db.rollback()
+        print(e)
+        return False
+    finally:
+        db.close()
 
 
 def update_host(host: Host):
@@ -49,14 +67,21 @@ def update_host(host: Host):
     :param user: 主机信息
     :return: 数据库存入信息
     """
-    with SessionLocal() as db:
-        data = db.query(models.Host).filter(models.Host.host == host.host).first()
-        if data:
-            for k, v in host:
-                setattr(data, k, v)
-            db.add(data)
-            db.commit()
-            return True
+    try:
+        with SessionLocal() as db:
+            data = db.query(models.Host).filter(models.Host.host == host.host).first()
+            if data:
+                for k, v in host:
+                    setattr(data, k, v)
+                db.add(data)
+                db.commit()
+                return True
+    except Exception as e:
+        db.rollback()
+        print(e)
+        return False
+    finally:
+        db.close()
 
 
 def delete_host(host: str):
