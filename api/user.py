@@ -7,8 +7,8 @@ from schemas.base import Response200
 from core.security import get_hash_password, get_current_user
 
 
-#user = APIRouter(tags=['用户相关'], dependencies=[Depends(get_current_user)])
-user = APIRouter(tags=['用户相关'])
+user = APIRouter(tags=['用户相关'], dependencies=[Depends(get_current_user)])
+# user = APIRouter(tags=['用户相关'])
 
 
 @user.get("/user", summary='用户信息', response_model=UserBase)

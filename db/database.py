@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from urllib import parse
 
-from core.config import settings
+from config import settings
 
 
 pwd = parse.quote_plus(settings.dbpasswd)

@@ -6,7 +6,7 @@ from fastapi import HTTPException, Depends
 from passlib.context import CryptContext
 from starlette import status
 
-from core.config import settings
+from config import settings
 from crud.user import get_user_by_name
 
 
