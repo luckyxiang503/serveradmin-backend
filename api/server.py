@@ -7,8 +7,7 @@ from schemas.server import Server
 from schemas.base import Response200
 
 
-# server = APIRouter(tags=["服务安装相关"], dependencies=[Depends(get_current_user)])
-server = APIRouter(tags=["服务安装相关"])
+server = APIRouter(tags=["服务安装相关"], dependencies=[Depends(get_current_user)])
 
 
 @server.post("/server", summary='服务安装接口')

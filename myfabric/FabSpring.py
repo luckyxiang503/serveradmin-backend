@@ -76,7 +76,7 @@ def jdkInstall(pkgsdir, conn, logger):
     conn.run("source /etc/profile")
     logger.info(">>>>>>>>>>>>>>>>>> jdk check <<<<<<<<<<<<<<<<")
     try:
-        conn.run("/usr/local/{}/bin/java java -version".format(jdkVersion))
+        conn.run("/usr/local/{}/bin/java -version".format(jdkVersion), hide=True)
     except:
         logger.error("java install faild!")
         return 1

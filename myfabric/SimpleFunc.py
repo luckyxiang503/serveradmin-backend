@@ -26,6 +26,9 @@ def createpasswd(length=10):
 def FileLog(name, host=None, loglevel=logging.DEBUG, logfile=settings.logfile):
     # 创建logger对象
     logger = logging.getLogger(name)
+    # 清空 handler,避免重复输出
+    logger.handlers = []
+    # 设置日志等级
     logger.setLevel(loglevel)
     # 创建 handler，写入文件
     fh = logging.FileHandler(logfile, mode='a')
@@ -38,11 +41,15 @@ def FileLog(name, host=None, loglevel=logging.DEBUG, logfile=settings.logfile):
     fh.setFormatter(formatter)
     # 将对应的handler添加到logger对象中
     logger.addHandler(fh)
+
     return logger
 
 def StreamLog(name, host=None, loglevel=logging.DEBUG):
     # 创建logger对象
     logger = logging.getLogger(name)
+    # 清空 handler,避免重复输出
+    logger.handlers = []
+    # 设置日志等级
     logger.setLevel(loglevel)
     # 创建 streamhandler
     ch = logging.StreamHandler()

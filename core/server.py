@@ -1,7 +1,6 @@
-import time
 
 from config import settings
-from src import FabRedis, FabMysql, FabRocketMq, FabSpring, FabTengine, FabMongodb, FabNacos, BaseTools, FabZookeeper
+from myfabric import *
 
 
 def install_server(server):
@@ -34,16 +33,3 @@ def install_server(server):
             FabZookeeper.fabZookeeper(pkgsdir, s)
         else:
             return False
-
-
-def read_server_log():
-    file = settings.logfile
-    f = open(file)
-    while True:
-        where = f.tell()
-        line = f.readline()
-        if not line:
-            time.sleep(1)
-            f.seek(where)
-        else:
-            print(line)

@@ -192,7 +192,6 @@ class fabMysql():
     def mysql1M1S(self, hosts):
         # 日志定义
         logger1 = SimpleFunc.FileLog("mysql_1", hosts[0]['ip'])
-        logger2 = SimpleFunc.FileLog("mysql_2", hosts[1]['ip'])
 
         # 系统用户密码
         mysqlpwd = SimpleFunc.createpasswd()
@@ -251,6 +250,7 @@ class fabMysql():
             position = positiong.group(1)
             logger1.info("[{}] mysqld install sueccess.".format(hosts[0]['ip']))
 
+        logger2 = SimpleFunc.FileLog("mysql_2", hosts[1]['ip'])
         logger2.info(">>>>>>>>>>>>>>> [{}] mysql slave install start. <<<<<<<<<<<<<<".format(hosts[1]['ip']))
         with fabric.Connection(host=hosts[1]['ip'], port=hosts[1]['port'], user=hosts[1]['user'],
                                connect_kwargs={"password": hosts[1]['password']}, connect_timeout=10) as conn:

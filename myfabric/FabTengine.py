@@ -109,7 +109,7 @@ class fabTengine():
         # 安装依赖包
         logger.info("yum install zlib-devel pcre-devel openssl-devel...")
         try:
-            conn.run("yum -y install zlib-devel pcre-devel openssl-devel")
+            conn.run("yum -y install zlib-devel pcre-devel openssl-devel", hide=True)
         except:
             logger.error("install faild!")
             return 1
@@ -117,7 +117,7 @@ class fabTengine():
         # 编译LuaJIT,使得nginx能支持lua
         logger.info(">>>>>>>>>>>>>>> install luajit <<<<<<<<<<<<<<<<<<<<")
         with conn.cd(self.remotepath):
-            conn.run("tar -xf {}.tar.gz".format(self.luajitVersion))
+            conn.run("tar -xf {}.tar.gz".format(self.luajitVersion), hide=True)
         logger.info("install luajit...")
         try:
             with conn.cd("{}/{}".format(self.remotepath, self.luajitVersion)):
@@ -129,19 +129,19 @@ class fabTengine():
         logger.info("luajit install success.")
         r = conn.run("grep -E \"LUAJIT_(LIB|INC)=/usr/local/luajit.*\" /etc/profile", hide=True, warn=True)
         if r.exited != 0:
-            conn.run("echo \"export LUAJIT_LIB=/usr/local/luajit/lib\" >> /etc/profile")
-            conn.run("echo \"export LUAJIT_INC=/usr/local/luajit/include/luajit-2.0\" >> /etc/profile")
+            conn.run("echo \"export LUAJIT_LIB=/usr/local/luajit/lib\" >> /etc/profile", hide=True)
+            conn.run("echo \"export LUAJIT_INC=/usr/local/luajit/include/luajit-2.0\" >> /etc/profile", hide=True)
 
         # 编译nginx
         logger.info(">>>>>>>>>>>>>>> install nginx <<<<<<<<<<<<<<<<<<<")
         with conn.cd(self.remotepath):
-            conn.run("tar -xf {}.tar.gz".format(self.nginxVersion))
+            conn.run("tar -xf {}.tar.gz".format(self.nginxVersion), hide=True)
         logger.info("install nginx...")
         try:
             with conn.cd("{}/{}".format(self.remotepath, self.nginxVersion)):
                 with conn.prefix("source /etc/profile"):
                     logger.info("configure runing...")
-                    conn.run("./configure --prefix=/usr/local/nginx/ --conf-path=/etc/nginx/nginx.conf --with-pcre --with-debug --with-http_stub_status_module --with-http_ssl_module --with-ld-opt=-Wl,-rpath,/usr/local/luajit/lib --add-module=modules/ngx_http_lua_module --add-module=modules/ngx_http_upstream_check_module --add-module=modules/ngx_http_reqstat_module")
+                    conn.run("./configure --prefix=/usr/local/nginx/ --conf-path=/etc/nginx/nginx.conf --with-pcre --with-debug --with-http_stub_status_module --with-http_ssl_module --with-ld-opt=-Wl,-rpath,/usr/local/luajit/lib --add-module=modules/ngx_http_lua_module --add-module=modules/ngx_http_upstream_check_module --add-module=modules/ngx_http_reqstat_module", hide=True)
                 logger.info("make runing...")
                 conn.run("make -j 4 && make install", hide=True)
         except:
@@ -183,7 +183,7 @@ class fabTengine():
         logger.info(">>>>>>>>>>>>>>> check nginx server <<<<<<<<<<<<<<")
         try:
             logger.info("check nginx server process.")
-            conn.run("ps -ef | grep nginx | grep -v grep")
+            conn.run("ps -ef | grep nginx | grep -v grep", hide=True)
             logger.info("nginx server listen port.")
             conn.run("ss -tunlp | grep nginx")
         except:

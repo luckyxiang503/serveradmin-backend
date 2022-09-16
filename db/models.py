@@ -1,6 +1,8 @@
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime
+from sqlalchemy.orm import relationship
 
 from db.database import Base
+
 
 class User(Base):
     __tablename__ = "users"
@@ -20,3 +22,24 @@ class Host(Base):
     port = Column(Integer(), comment="端口")
     user = Column(String(20), comment="用户")
     password = Column(String(100), comment="密码")
+
+
+class Server(Base):
+    __tablename__ = "server"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    srvname = Column(String(20), comment="服务名")
+    mode = Column(String(20), comment="安装模式")
+    createtime = Column(DateTime, comment="创建时间")
+    updatetime = Column(DateTime, comment="更新时间")
+
+    serverhost = relationship('ServerHost', backref="server")
+
+
+class ServerHost(Base):
+    __tablename__ = "serverhost"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    host = Column(String(20))
+    server_id = Column(Integer, ForeignKey('server.id'))
+

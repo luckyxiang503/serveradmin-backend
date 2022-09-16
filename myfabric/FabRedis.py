@@ -125,8 +125,8 @@ class fabRedis():
 
         # 连接远程机器
         logger.info(">>>>>>>>>>>>>>> redis install start <<<<<<<<<<<<<<")
-        with fabric.Connection(host=host['ip'],port=host['port'],user=host['user'],
-                                 connect_kwargs={"password": host['password']},connect_timeout=10) as conn:
+        with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
+                               connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
             # 调用安装函数
             rcode = self.redisInstall(conn, logger)
             if rcode == 0:
@@ -193,7 +193,7 @@ class fabRedis():
         # 连接远程机器
         logger.info(">>>>>>>>>>>>>>> redis install start <<<<<<<<<<<<<<")
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
-                                 connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
+                               connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
             # 调用安装函数
             rcode = self.redisInstall(conn, logger)
             if rcode == 0:
@@ -276,7 +276,7 @@ class fabRedis():
             s = host['ip'].split('.')[-1]
             logger = SimpleFunc.FileLog("rediscluster3_{}".format(s), host['ip'])
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
-                                     connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
+                                   connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 # 调用安装函数
                 rcode = self.redisInstall(conn, logger)
                 if rcode == 0:
@@ -370,7 +370,7 @@ class fabRedis():
             s = host['ip'].split('.')[-1]
             logger = SimpleFunc.FileLog("rediscluster6_{}".format(s), host['ip'])
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
-                                     connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
+                                   connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 # 调用安装函数
                 rcode = self.redisInstall(conn, logger)
                 if rcode == 0:

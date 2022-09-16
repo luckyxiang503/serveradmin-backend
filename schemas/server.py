@@ -9,8 +9,8 @@ class Host(BaseModel):
     password: str
     role: str
 
+
 class Server(BaseModel):
     srvname: str
     mode: str
-    tool: list
     host: List[Host]

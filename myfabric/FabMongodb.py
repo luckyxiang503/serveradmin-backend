@@ -123,7 +123,7 @@ class fabMongodb():
             # 连接远程机器
             logger.info(">>>>>>>>>>>>>>> mongodb install start <<<<<<<<<<<<<<")
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
-                                     connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
+                                   connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 # 调用安装函数
                 rcode = self.mongodbInstall(conn, logger)
                 if rcode == 0:

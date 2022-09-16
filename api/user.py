@@ -25,6 +25,7 @@ async def read_users(skip: int = 0, limit: int = 10):
         raise HTTPException(status_code=404, detail="用户不存在")
     return users
 
+
 @user.get("/alluser", response_model=List[UserBase], summary='所有用户',)
 async def get_all_user():
     users = get_all_users()

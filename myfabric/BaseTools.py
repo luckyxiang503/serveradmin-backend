@@ -17,7 +17,6 @@ def base(pkgsdir, d):
     pypkgpath = os.path.join(pkgsdir, 'pypi')
     remotepath = '/opt/pkgs/base'
     pyremotepath = '/opt/pkgs/pypi'
-    tools = d['tool']
     hosts = d['host']
 
     repotools = ['tsar', 'netdata', 'sysstat', 'iotop', 'iftop', 'dstat', 'net-tools', 'clamav']
@@ -80,43 +79,42 @@ def base(pkgsdir, d):
             }
             logger.info("install tar unzip gcc make net-tools...")
             conn.run("yum -y install tar unzip gcc make net-tools", warn=True, hide=True)
-            if 'glances' in tools or 'asciinema' in tools:
-                r = conn.run("which python3 >/dev/null && which pip3 >/dev/null", warn=True, hide=True)
-                if r != 0:
-                    logger.info("install python3")
-                    r = conn.run("yum -y install python3", warn=True, hide=True)
-                    if r.exited != 0:
-                        logger.error("python install faild!")
-                    else:
-                        conn.run("pip3 install --upgrade --index-url=file://{}/simple pip".format(pyremotepath), hide=True, warn=True)
-                        conn.run("pip3 install --upgrade --index-url=file://{}/simple setuptools".format(pyremotepath), hide=True, warn=True)
+            r = conn.run("which python3 >/dev/null && which pip3 >/dev/null", warn=True, hide=True)
+            if r != 0:
+                logger.info("install python3")
+                r = conn.run("yum -y install python3", warn=True, hide=True)
+                if r.exited != 0:
+                    logger.error("python install faild!")
+                else:
+                    conn.run("pip3 install --upgrade --index-url=file://{}/simple pip".format(pyremotepath), hide=True, warn=True)
+                    conn.run("pip3 install --upgrade --index-url=file://{}/simple setuptools".format(pyremotepath), hide=True, warn=True)
 
-            for tool in tools:
-                if tool in repotools:
-                    logger.info("check {} isn't installed.".format(tool))
-                    r = conn.run("rpm -qa | grep {}".format(tool), warn=True, hide=True)
-                    if r.exited == 0:
-                        logger.info("{} is installed.".format(tool))
-                        result['succ'].append(tool)
-                        continue
+            for tool in repotools:
+                logger.info("check {} isn't installed.".format(tool))
+                r = conn.run("rpm -qa | grep {}".format(tool), warn=True, hide=True)
+                if r.exited == 0:
+                    logger.info("{} is installed.".format(tool))
+                    result['succ'].append(tool)
+                    continue
 
-                    logger.info("install {}.......".format(tool))
-                    r = conn.run("yum -y install {}".format(tool), warn=True, hide=True)
-                    if r.exited != 0:
-                        logger.error("{} install faild!".format(tool))
-                        result['fail'].append(tool)
-                    else:
-                        logger.info("{} install success".format(tool))
-                        result['succ'].append(tool)
-                elif tool in piptools:
-                    logger.info("install {}.......".format(tool))
-                    r = conn.run("pip3 install --index-url=file://{}/simple {}".format(pyremotepath, tool), warn=True, hide=True)
-                    if r.exited != 0:
-                        logger.error("{} install faild!".format(tool))
-                        result['fail'].append(tool)
-                    else:
-                        logger.info("{} install success".format(tool))
-                        result['succ'].append(tool)
+                logger.info("install {}.......".format(tool))
+                r = conn.run("yum -y install {}".format(tool), warn=True, hide=True)
+                if r.exited != 0:
+                    logger.error("{} install faild!".format(tool))
+                    result['fail'].append(tool)
+                else:
+                    logger.info("{} install success".format(tool))
+                    result['succ'].append(tool)
+
+            for tool in piptools:
+                logger.info("install {}.......".format(tool))
+                r = conn.run("pip3 install --index-url=file://{}/simple {}".format(pyremotepath, tool), warn=True, hide=True)
+                if r.exited != 0:
+                    logger.error("{} install faild!".format(tool))
+                    result['fail'].append(tool)
+                else:
+                    logger.info("{} install success".format(tool))
+                    result['succ'].append(tool)
             res.append(result)
 
     with open(msgFile, 'a+', encoding='utf-8') as f:
