@@ -32,6 +32,8 @@ class Server(Base):
     mode = Column(String(20), comment="安装模式")
     createtime = Column(DateTime, comment="创建时间")
     updatetime = Column(DateTime, comment="更新时间")
+    status = Column(Integer, comment="状态, 0: 未安装,1: 安装中,2: 安装成功,3: 安装失败")
+    logfile = Column(String(255), comment="安装日志文件")
 
     serverhost = relationship('ServerHost', backref="server")
 
@@ -40,6 +42,9 @@ class ServerHost(Base):
     __tablename__ = "serverhost"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    host = Column(String(20))
+    host_id = Column(Integer, ForeignKey('hosts.id'))
     server_id = Column(Integer, ForeignKey('server.id'))
+    role = Column(String(20), comment="主机角色")
+
+    hosts = relationship('Host', uselist=False, backref="serverhost")
 

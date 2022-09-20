@@ -12,8 +12,6 @@ import SimpleFunc
 class fabMongodb():
     def __init__(self, pkgsdir, d):
         self.pkgpath = os.path.join(pkgsdir, d['srvname'])
-        mode = d['mode']
-        hosts = d['host']
         self.remotepath = "/opt/pkgs/mongodb"
         self.installpath = "/usr/local/mongodb"
         self.datapath = "/opt/mongodb"
@@ -27,22 +25,26 @@ class fabMongodb():
         dirpath = os.path.dirname(__file__)
         self.msgFile = os.path.join(os.path.dirname(dirpath), "ServerMsg.txt")
 
-        self.mongodbMain(mode, hosts)
+        self.mongodbMain(d)
 
-    def mongodbMain(self, mode, hosts):
+    def mongodbMain(self, d):
+        mode = d['mode']
+        hosts = d['host']
         hostnum = len(hosts)
+        logfile = d['logfile']
+
         if mode == "mongodb-single" and hostnum == 1:
-            self.mongodbSingle(hosts[0])
+            self.mongodbSingle(hosts[0], logfile)
         elif mode == "mongodb-sharding":
-            self.mongodbSharding(hosts)
+            self.mongodbSharding(hosts, logfile)
         else:
             print("ERROR: host num or mode is not true!")
             return 1
 
-    def mongodbSingle(self, host):
+    def mongodbSingle(self, host, logfile):
         mongodpwd = SimpleFunc.createpasswd()
         # 日志定义
-        logger = SimpleFunc.FileLog('mongodb-single', host['ip'])
+        logger = SimpleFunc.FileLog(logfile=logfile)
 
         # 连接远程机器
         logger.info(">>>>>>>>>>>>>>> mongodb install start <<<<<<<<<<<<<<")
@@ -99,29 +101,17 @@ class fabMongodb():
             f.write("logpath: {}\n".format(self.logpath))
             f.write("datapath: {}\n\n".format(self.datapath))
 
-    def mongodbSharding(self, hosts):
+    def mongodbSharding(self, hosts, logfile):
         mongodpwd = SimpleFunc.createpasswd()
-        shardlist, configlist, mongoslist = [], [], []
-        S, C, M = [], [], []
-        for host in hosts:
-            role = host['role'].split(' ')
-            if 'configsrv' in role:
-                C.append("{}:27000".format(host['ip']))
-            if 'shard' in role:
-                S.append("{}:27001".format(host['ip']))
-                S.append("{}:27002".format(host['ip']))
-                S.append("{}:27003".format(host['ip']))
-            if 'mongos' in role:
-                M.append("{}:27017".format(host['ip']))
-        configDB = "config/{}".format(",".join(C))
 
-        for host in hosts:
-            s = host['ip'].split('.')[-1]
-            # 日志定义
-            logger = SimpleFunc.FileLog('mongodb_shard_{}'.format(s), host['ip'])
+        # 日志定义
+        logger = SimpleFunc.FileLog(logfile=logfile)
 
+        H = []
+        for host in hosts:
+            H.append(host['ip'])
             # 连接远程机器
-            logger.info(">>>>>>>>>>>>>>> mongodb install start <<<<<<<<<<<<<<")
+            logger.info(">>>>>>>>>>>>>> [{}] mongodb install start <<<<<<<<<<<<<<".format(host['ip']))
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 # 调用安装函数
@@ -139,79 +129,74 @@ class fabMongodb():
                 conn.run("id mongod >/dev/null 2>&1 || useradd mongod", warn=True, hide=True)
                 conn.run("echo '{}' | passwd --stdin mongod".format(mongodpwd), warn=True, hide=True)
                 conn.run("mkdir -p /var/run/mongodb && chown -R mongod:mongod /var/run/mongodb", warn=True)
-                # 安装组件
-                role = host['role'].split(' ')
-                if 'shard' in role:
-                    shardlist.append(host)
-                    for i in ['shard1', 'shard2', 'shard3']:
-                        logger.info("crete {} path...".format(i))
-                        conn.run("mkdir -p {0}/{3} {1}/{3} {2}/{3}".format(self.clulogpath, self.cluconfpath, self.cludatapath, i))
-                        logger.info("copy {} mongod.conf...".format(i))
-                        conn.run("cp -f {0}/mongod-shard.conf {1}/{2}/mongod.conf".format(self.remotepath, self.cluconfpath, i))
-                        conn.run("sed -i 's/shard1/{1}/g' {0}/{1}/mongod.conf".format(self.cluconfpath, i), warn=True)
-                    conn.run("sed -i 's/port: .*/port: 27001/' {}/shard1/mongod.conf".format(self.cluconfpath), warn=True)
-                    conn.run("sed -i 's/port: .*/port: 27002/' {}/shard2/mongod.conf".format(self.cluconfpath), warn=True)
-                    conn.run("sed -i 's/port: .*/port: 27003/' {}/shard3/mongod.conf".format(self.cluconfpath), warn=True)
-                    conn.run("chown -R mongod:mongod {} {} {}".format(self.clulogpath, self.cludatapath, self.cluconfpath))
 
-                    for i in ['shard1', 'shard2', 'shard3']:
-                        logger.info("copy {} service file...".format(i))
-                        conn.run("cp -f {}/mongod-shard.service /lib/systemd/system/mongod-{}.service".format(self.remotepath, i))
-                        conn.run("sed -i 's/shard1/{0}/g' /lib/systemd/system/mongod-{0}.service".format(i), warn=True)
-                        logger.info("starting shardsrv {}....".format(i))
-                        try:
-                            conn.run("systemctl daemon-reload")
-                            conn.run("systemctl start mongod-{}".format(i))
-                            conn.run("systemctl enable mongod-{}".format(i))
-                        except:
-                            logger.error("start shardsrv {} faild!".format(i))
-                            return 1
-                        logger.info("start shardsrv {} success.".format(i))
-                if 'configsrv' in role:
-                    configlist.append(host)
-                    logger.info("create configsrv data path...")
-                    conn.run("mkdir -p {0}/configsrv {1}/configsrv {2}/configsrv".format(self.clulogpath, self.cluconfpath, self.cludatapath))
-                    logger.info("copy configsrv file...")
-                    conn.run("cp -f {}/mongod-config.conf {}/configsrv/mongocfg.conf".format(self.remotepath, self.cluconfpath))
-                    logger.info("copy configsrv service file...")
-                    conn.run("cp -f {}/mongod-config.service /lib/systemd/system/mongod-config.service".format(self.remotepath))
-                    conn.run("chown -R mongod:mongod {} {} {}".format(self.clulogpath, self.cludatapath, self.cluconfpath))
-                    logger.info("starting configsrv....")
+                # mongodb shard
+                for i in ['shard1', 'shard2', 'shard3']:
+                    logger.info("crete {} path...".format(i))
+                    conn.run("mkdir -p {0}/{3} {1}/{3} {2}/{3}".format(self.clulogpath, self.cluconfpath, self.cludatapath, i))
+                    logger.info("copy {} mongod.conf...".format(i))
+                    conn.run("cp -f {0}/mongod-shard.conf {1}/{2}/mongod.conf".format(self.remotepath, self.cluconfpath, i))
+                    conn.run("sed -i 's/shard1/{1}/g' {0}/{1}/mongod.conf".format(self.cluconfpath, i), warn=True)
+                conn.run("sed -i 's/port: .*/port: 27001/' {}/shard1/mongod.conf".format(self.cluconfpath), warn=True)
+                conn.run("sed -i 's/port: .*/port: 27002/' {}/shard2/mongod.conf".format(self.cluconfpath), warn=True)
+                conn.run("sed -i 's/port: .*/port: 27003/' {}/shard3/mongod.conf".format(self.cluconfpath), warn=True)
+                conn.run("chown -R mongod:mongod {} {} {}".format(self.clulogpath, self.cludatapath, self.cluconfpath))
+                for i in ['shard1', 'shard2', 'shard3']:
+                    logger.info("copy {} service file...".format(i))
+                    conn.run("cp -f {}/mongod-shard.service /lib/systemd/system/mongod-{}.service".format(self.remotepath, i))
+                    conn.run("sed -i 's/shard1/{0}/g' /lib/systemd/system/mongod-{0}.service".format(i), warn=True)
+                    logger.info("starting shardsrv {}....".format(i))
                     try:
                         conn.run("systemctl daemon-reload")
-                        conn.run("systemctl start mongod-config")
-                        conn.run("systemctl enable mongod-config")
+                        conn.run("systemctl start mongod-{}".format(i))
+                        conn.run("systemctl enable mongod-{}".format(i))
                     except:
-                        logger.error("start mongod-config faild!")
+                        logger.error("start shardsrv {} faild!".format(i))
                         return 1
-                    logger.info("start mongod-config success.")
-                if 'mongos' in role:
-                    mongoslist.append(host)
-                    logger.info("create mongos path...")
-                    conn.run("mkdir -p {0}/mongos {1}/mongos".format(self.clulogpath, self.cluconfpath))
-                    logger.info("copy mongos configfile...")
-                    conn.run(
-                        "cp -f {}/mongod-mongos.conf {}/mongos/mongos.conf".format(self.remotepath, self.cluconfpath))
-                    conn.run("sed -i 's#configDB:.*#configDB: {}#' {}/mongos/mongos.conf".format(configDB, self.cluconfpath))
-                    logger.info("copy mongos service file...")
-                    conn.run(
-                        "cp -f {}/mongod-mongos.service /lib/systemd/system/mongod-mongos.service".format(self.remotepath))
-                    conn.run("chown -R mongod:mongod {} {} {}".format(self.clulogpath, self.cludatapath, self.cluconfpath))
+                    logger.info("start shardsrv {} success.".format(i))
+
+                # mongodb config
+                logger.info("create configsrv data path...")
+                conn.run("mkdir -p {0}/configsrv {1}/configsrv {2}/configsrv".format(self.clulogpath, self.cluconfpath, self.cludatapath))
+                logger.info("copy configsrv file...")
+                conn.run("cp -f {}/mongod-config.conf {}/configsrv/mongocfg.conf".format(self.remotepath, self.cluconfpath))
+                logger.info("copy configsrv service file...")
+                conn.run("cp -f {}/mongod-config.service /lib/systemd/system/mongod-config.service".format(self.remotepath))
+                conn.run("chown -R mongod:mongod {} {} {}".format(self.clulogpath, self.cludatapath, self.cluconfpath))
+                logger.info("starting configsrv....")
+                try:
+                    conn.run("systemctl daemon-reload")
+                    conn.run("systemctl start mongod-config")
+                    conn.run("systemctl enable mongod-config")
+                except:
+                    logger.error("start mongod-config faild!")
+                    return 1
+                logger.info("start mongod-config success.")
+
+                # mongodb mongos
+                logger.info("create mongos path...")
+                conn.run("mkdir -p {0}/mongos {1}/mongos".format(self.clulogpath, self.cluconfpath))
+                logger.info("copy mongos configfile...")
+                conn.run(
+                    "cp -f {}/mongod-mongos.conf {}/mongos/mongos.conf".format(self.remotepath, self.cluconfpath))
+                conn.run("sed -i 's#configDB:.*#configDB: {}#' {}/mongos/mongos.conf".format(configDB, self.cluconfpath))
+                logger.info("copy mongos service file...")
+                conn.run(
+                    "cp -f {}/mongod-mongos.service /lib/systemd/system/mongod-mongos.service".format(self.remotepath))
+                conn.run("chown -R mongod:mongod {} {} {}".format(self.clulogpath, self.cludatapath, self.cluconfpath))
 
                 logger.info(">>>>>>>>>>>>>>>>  check mongo server  <<<<<<<<<<<<<<<")
                 self.mongodbCheck(conn, logger)
 
-
-        logger = SimpleFunc.FileLog("mongodb-shard-main")
         logger.info(">>>>>>>>>>>>>>>>>>> mongodb cluster init  <<<<<<<<<<<<<<<<<<<<<<")
         # 创建config repset
-        host = configlist[0]
+        host = hosts[0]
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
             logger.info("mongodb configsrv repSet...")
             members = []
-            for i in range(len(configlist)):
-                members.append('{{"_id":{},"host":"{}:27000"}}'.format(i+1, configlist[i]['ip']))
+            for i in range(len(hosts)):
+                members.append('{{"_id":{},"host":"{}:27000"}}'.format(i+1, hosts[i]['ip']))
             cfg = 'rs.initiate({{"_id":"config", configsvr: true, "members":[{}] }})'.format(",".join(members))
             logger.info("configsrv: {}".format(cfg))
             try:
@@ -219,16 +204,13 @@ class fabMongodb():
             except:
                 logger.error("mongodb configsrv repSet faild！")
                 return 1
-        # 创建shard repset
-        host = shardlist[0]
-        with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
-                               connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
+
             logger.info("mongodb shardsrv repSet...")
             dc = {'shard1': 27001, 'shard2': 27002, 'shard3': 27003}
             for h in dc:
                 members = []
-                for i in range(len(shardlist)):
-                    members.append('{{"_id":{},"host":"{}:{}"}}'.format(i + 1, shardlist[i]['ip'], dc[h]))
+                for i in range(len(hosts)):
+                    members.append('{{"_id":{},"host":"{}:{}"}}'.format(i + 1, hosts[i]['ip'], dc[h]))
                 cfg = 'rs.initiate({{"_id":"{}","members":[{}] }})'.format(h, ",".join(members))
                 logger.info("{}: {}".format(h, cfg))
                 try:
@@ -236,8 +218,9 @@ class fabMongodb():
                 except:
                     logger.error("mongodb shardsrv repSet {} faild！".format(h))
                     return 1
+
         # mongos 服务启动与配置分片路由
-        for host in mongoslist:
+        for host in hosts:
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 logger.info("[{}] starting mongos....".find(host['ip']))
@@ -254,7 +237,7 @@ class fabMongodb():
                 dc = {'shard1': 27001, 'shard2': 27002, 'shard3': 27003}
                 for h in dc:
                     members = []
-                    for host in shardlist:
+                    for host in hosts:
                         members.append("{}:{}".format(host['ip'], dc[h]))
                     cfg = "sh.addShard(\"{}/{}\")".format(h, ",".join(members))
                     logger.info("[{}] mongos: {}".format(host['ip'], cfg))
@@ -265,16 +248,14 @@ class fabMongodb():
                         return 1
                 self.mongodbCheck(conn, logger)
 
-
         # 将服务信息写入文件
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  MongoDB server  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
             f.write("time: {}\n".format(dtime))
             f.write("Model: mongodb-sharding\n")
-            f.write("mongos: {}\n".format(";".join(M)))
-            f.write("shardsrv: {}\n".format(";".join(S)))
-            f.write("configsrv: {}\n".format(";".join(C)))
+            f.write("mongodb: {}\n".format(";".join(H)))
+            f.write("port: 27000,27001,27002,27003,27017\n")
             f.write("system user: mongod, passwd: {}\n".format(mongodpwd))
             f.write("configpath: {}/[shard1,shard2,shard3,configsrv,mongos]\n".format(self.cluconfpath))
             f.write("logpath: {}/[shard1,shard2,shard3,configsrv,mongos]\n".format(self.clulogpath))

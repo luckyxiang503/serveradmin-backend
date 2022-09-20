@@ -14,6 +14,7 @@ class fabRocketmq():
         self.pkgpath = os.path.join(pkgsdir, d['srvname'])
         mode = d['mode']
         hosts = d['host']
+        self.logfile = d['logfile']
         self.remotepath = "/opt/pkgs/rocketmq"
         self.rocketmqPath = "/opt/rocketMQ"
         self.datapath = "/opt/rocketMQ/data"
@@ -125,7 +126,7 @@ class fabRocketmq():
 
     def rocketmqSingle(self, host):
         # 日志定义
-        logger = SimpleFunc.FileLog('rocketSingle', host['ip'])
+        logger = SimpleFunc.FileLog(logfile=self.logfile)
 
         logger.info(">>>>>>>>>>>>>>>>>>>> [{}] rocketmq start install <<<<<<<<<<<<<<<<<<<".format(host['ip']))
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
@@ -201,9 +202,9 @@ class fabRocketmq():
             host['SelfId'] = m
             m += 1
 
+        # 日志定义
+        logger = SimpleFunc.FileLog(logfile=self.logfile)
         for host in hosts:
-            s = host['ip'].split('.')[-1]
-            logger = SimpleFunc.FileLog('rocketmq_{}'.format(s), host['ip'])
 
             logger.info(">>>>>>>>>>>>>>>>>>>> [{}] rocketmq start install <<<<<<<<<<<<<<<<<<<".format(host['ip']))
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],

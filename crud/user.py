@@ -59,6 +59,7 @@ def get_users(skip: int = 0, limit: int = 100):
         users = db.query(models.User).offset(skip).limit(limit).all()
     return users
 
+
 def get_all_users():
     """
     批量获取用户信息
@@ -69,6 +70,7 @@ def get_all_users():
         users = db.query(models.User).all()
     return users
 
+
 def delete_user(username: str):
     """
     删除用户
@@ -76,7 +78,14 @@ def delete_user(username: str):
     :param username: 用户名
     :return: 用户信息
     """
-    with SessionLocal() as db:
+    db = SessionLocal()
+    try:
         db.query(models.User).filter(models.User.username == username).delete()
         db.commit()
         return True
+    except Exception as e:
+        db.rollback()
+        print(e)
+        return False
+    finally:
+        db.close()

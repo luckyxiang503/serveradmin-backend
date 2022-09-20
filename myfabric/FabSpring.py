@@ -11,12 +11,13 @@ import SimpleFunc
 jdkPkgName = "jdk-8u341-linux-x64.tar.gz"
 jdkVersion = "jdk1.8.0_341"
 
+
 def jdkMain(pkgsdir, d):
+    logfile = d['logfile']
+    logger = SimpleFunc.FileLog(logfile=logfile)
     hosts = d['host']
     for host in hosts:
         # 连接远程机器
-        s = host['ip'].split('.')[-1]
-        logger = SimpleFunc.FileLog("jdk_{}".format(s), host['ip'])
         logger.info(">>>>>>>>>>>>>>>>> [{}] jdk install <<<<<<<<<<<<<<<<<<".format(host['ip']))
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
@@ -25,6 +26,7 @@ def jdkMain(pkgsdir, d):
                 logger.error("jdk install faild!")
                 return 1
             logger.info("jdk install success.")
+
 
 def jdkInstall(pkgsdir, conn, logger):
     pkgpath = os.path.join(pkgsdir, "tools")
@@ -93,10 +95,10 @@ def appinit(pkgsdir, d):
     user = "spring"
     upasswd = SimpleFunc.createpasswd()
 
+    logfile = d['logfile']
+    logger = SimpleFunc.FileLog(logfile=logfile)
     for host in hosts:
         # 连接远程机器
-        s = host['ip'].split('.')[-1]
-        logger = SimpleFunc.FileLog("app_{}".format(s), host['ip'])
         logger.info(">>>>>>>>>>>>>>>>> app init <<<<<<<<<<<<<<<<<<".format(host['ip']))
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:

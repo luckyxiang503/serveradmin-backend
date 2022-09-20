@@ -22,8 +22,10 @@ class bcolors:
     Cyan = '\033[0;36m'  # Cyan
     White = '\033[0;37m'  # White
 
+
 def title(s):
     print(bcolors.Blue + ">"*20 + "  {}  ".format(s) + "<"*20 + bcolors.Coloroff)
+
 
 class CheckServer():
     def __init__(self, l):

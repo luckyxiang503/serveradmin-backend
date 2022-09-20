@@ -17,6 +17,7 @@ class fabNacos():
         self.pkgsdir = pkgsdir
         hosts = d['host']
         mode = d['mode']
+        self.logfile = d['logfile']
         self.pkgpath = os.path.join(pkgsdir, d['srvname'])
         self.remotepath = "/opt/pkgs/nacos"
         self.nacospath = "/opt/nacos"
@@ -38,8 +39,9 @@ class fabNacos():
             return 1
 
     def nacosSingle(self, host):
-        # 日志
-        logger = SimpleFunc.FileLog("nacos-single", host['ip'])
+        # 日志定义
+        logger = SimpleFunc.FileLog(logfile=self.logfile)
+
         logger.info(">>>>>>>>>>>>>>> [{}] nacos install start <<<<<<<<<<<<<<".format(host['ip']))
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
@@ -95,10 +97,11 @@ class fabNacos():
         upasswd = SimpleFunc.createpasswd()
         for host in hosts:
             l.append(host['ip'])
+
+        # 日志定义
+        logger = SimpleFunc.FileLog(logfile=self.logfile)
+
         for host in hosts:
-            s = host['ip'].split('.')[-1]
-            # 日志
-            logger = SimpleFunc.FileLog("nacoscluster-{}".format(s), host['ip'])
             logger.info(">>>>>>>>>>>>>>> [{}] nacos install start <<<<<<<<<<<<<<".format(host['ip']))
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:

@@ -46,12 +46,12 @@ def add_host(host: Host):
     :return: 数据库存入信息
     """
     db_host = models.Host(**host.dict())
+    db = SessionLocal()
     try:
-        with SessionLocal() as db:
-            db.add(db_host)
-            db.commit()
-            db.refresh(db_host)
-            return True
+        db.add(db_host)
+        db.commit()
+        db.refresh(db_host)
+        return True
     except Exception as e:
         db.rollback()
         print(e)
@@ -67,15 +67,15 @@ def update_host(host: Host):
     :param user: 主机信息
     :return: 数据库存入信息
     """
+    db = SessionLocal()
     try:
-        with SessionLocal() as db:
-            data = db.query(models.Host).filter(models.Host.host == host.host).first()
-            if data:
-                for k, v in host:
-                    setattr(data, k, v)
-                db.add(data)
-                db.commit()
-                return True
+        data = db.query(models.Host).filter(models.Host.host == host.host).first()
+        if data:
+            for k, v in host:
+                setattr(data, k, v)
+            db.add(data)
+            db.commit()
+            return True
     except Exception as e:
         db.rollback()
         print(e)
@@ -91,7 +91,14 @@ def delete_host(host: str):
     :param host: 主机名
     :return: bool
     """
-    with SessionLocal() as db:
+    db = SessionLocal()
+    try:
         db.query(models.Host).filter(models.Host.host == host).delete()
         db.commit()
         return True
+    except Exception as e:
+        db.rollback()
+        print(e)
+        return False
+    finally:
+        db.close()

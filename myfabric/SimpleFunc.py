@@ -6,6 +6,7 @@
     一些常用函数
 '''
 import logging
+import os.path
 import random
 
 from config import settings
@@ -23,30 +24,37 @@ def createpasswd(length=10):
     return new_passwd
 
 
-def FileLog(name, host=None, loglevel=logging.DEBUG, logfile=settings.logfile):
+def FileLog(logfile, loglevel=logging.INFO):
     # 创建logger对象
-    logger = logging.getLogger(name)
+    logger = logging.getLogger('FabricServer')
     # 清空 handler,避免重复输出
     logger.handlers = []
     # 设置日志等级
     logger.setLevel(loglevel)
     # 创建 handler，写入文件
-    fh = logging.FileHandler(logfile, mode='a')
-    fh.setLevel(loglevel)
+    logfile1 = settings.logfile
+    fh1 = logging.FileHandler(logfile1)
+    fh1.setLevel(loglevel)
+
+    logfile2 = os.path.join(settings.logpath, logfile)
+    fh2 = logging.FileHandler(logfile2)
+    fh2.setLevel(loglevel)
     # 定义输出格式
-    if host == None:
-        formatter = logging.Formatter('[%(asctime)s] [%(funcName)s] [%(levelname)s]: %(message)s')
-    else:
-        formatter = logging.Formatter('[%(asctime)s] [{}] [%(funcName)s] [%(levelname)s]: %(message)s'.format(host))
-    fh.setFormatter(formatter)
+    formatter = logging.Formatter('[%(asctime)s] [%(funcName)s] [%(levelname)s]: %(message)s')
+
+    fh1.setFormatter(formatter)
+    fh2.setFormatter(formatter)
+
     # 将对应的handler添加到logger对象中
-    logger.addHandler(fh)
+    logger.addHandler(fh1)
+    logger.addHandler(fh2)
 
     return logger
 
-def StreamLog(name, host=None, loglevel=logging.DEBUG):
+
+def StreamLog(loglevel=logging.DEBUG):
     # 创建logger对象
-    logger = logging.getLogger(name)
+    logger = logging.getLogger('FabricServer')
     # 清空 handler,避免重复输出
     logger.handlers = []
     # 设置日志等级
@@ -55,10 +63,8 @@ def StreamLog(name, host=None, loglevel=logging.DEBUG):
     ch = logging.StreamHandler()
     ch.setLevel(loglevel)
     # 定义输出格式
-    if host == None:
-        formatter = logging.Formatter('[%(asctime)s] [%(funcName)s] [%(levelname)s]: %(message)s')
-    else:
-        formatter = logging.Formatter('[%(asctime)s] [{}] [%(funcName)s] [%(levelname)s]: %(message)s'.format(host))
+    formatter = logging.Formatter('[%(asctime)s] [%(funcName)s] [%(levelname)s]: %(message)s')
+
     ch.setFormatter(formatter)
     # 将对应的handler添加到logger对象中
     logger.addHandler(ch)

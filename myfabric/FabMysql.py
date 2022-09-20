@@ -15,6 +15,7 @@ class fabMysql():
         self.pkgpath = os.path.join(pkgsdir, d['srvname'])
         mode = d['mode']
         hosts = d['host']
+        self.logfile = d['logfile']
         self.remotepath = "/opt/pkgs/mysql"
         self.perconapath = "/opt/pkgs/mysql/percona"
         self.datapath = "/data/mysql"
@@ -144,7 +145,7 @@ class fabMysql():
 
     def mysqlSingle(self, host):
         # 日志定义
-        logger = SimpleFunc.FileLog("mysql_1", host['ip'])
+        logger = SimpleFunc.FileLog(logfile=self.logfile)
 
         # 系统用户账号密码
         mysqlpwd = SimpleFunc.createpasswd()
@@ -191,7 +192,7 @@ class fabMysql():
 
     def mysql1M1S(self, hosts):
         # 日志定义
-        logger1 = SimpleFunc.FileLog("mysql_1", hosts[0]['ip'])
+        logger = SimpleFunc.FileLog(logfile=self.logfile)
 
         # 系统用户密码
         mysqlpwd = SimpleFunc.createpasswd()
@@ -203,30 +204,30 @@ class fabMysql():
         if hosts[0]['role'] == 'slave' and hosts[1]['role'] == 'master':
             hosts.reverse()
 
-        logger1.info(">>>>>>>>>>>>>>> [{}] mysql master install start. <<<<<<<<<<<<<<".format(hosts[0]['ip']))
+        logger.info(">>>>>>>>>>>>>>> [{}] mysql master install start. <<<<<<<<<<<<<<".format(hosts[0]['ip']))
         with fabric.Connection(host=hosts[0]['ip'], port=hosts[0]['port'], user=hosts[0]['user'],
                                connect_kwargs={"password": hosts[0]['password']}, connect_timeout=10) as conn:
 
             # 安装mysql
-            rcode = self.mysqlInstall(conn, logger1)
+            rcode = self.mysqlInstall(conn, logger)
             if rcode == 0:
-                logger1.info("mysql install stop.")
+                logger.info("mysql install stop.")
                 return
             elif rcode == 1:
-                logger1.error("mysql install faild !")
+                logger.error("mysql install faild !")
                 return 1
-            logger1.info("mysql install success")
+            logger.info("mysql install success")
 
             # mysql初始化配置
             serverid = hosts[0]['ip'].split('.')[-1]
-            rcode = self.mysqlInit(conn, serverid, logger1, rootpwd, mysqlpwd)
+            rcode = self.mysqlInit(conn, serverid, logger, rootpwd, mysqlpwd)
             if rcode != None:
                 return 1
             # 检查服务
-            self.checkMysql(conn, logger1)
+            self.checkMysql(conn, logger)
             time.sleep(5)
             # 创建复制账号，并提取master bin-log日志信息
-            logger1.info("create mysql rep user.")
+            logger.info("create mysql rep user.")
             try:
                 conn.run(
                     "echo \"grant replication slave on *.* to 'rep'@'{}' identified by '{}';\" > /tmp/temp.sql".format(
@@ -234,7 +235,7 @@ class fabMysql():
                 conn.run("echo \"flush privileges;\" >> /tmp/temp.sql")
                 conn.run("mysql -h127.0.0.1 -P3306 -p'{}' -e \"source /tmp/temp.sql\"".format(rootpwd), hide=True)
             except:
-                logger1.error("create mysql user error!")
+                logger.error("create mysql user error!")
                 return 1
             finally:
                 conn.run("rm -f /tmp/temp.sql", warn=True, hide=True)
@@ -244,37 +245,36 @@ class fabMysql():
             binFileg = re.search(r'File: (.*)', s)
             positiong = re.search(r"Position: (.*)", s)
             if binFileg == None or positiong == None:
-                logger1.error("mysql bin file get error!")
+                logger.error("mysql bin file get error!")
                 return 1
             binFile = binFileg.group(1)
             position = positiong.group(1)
-            logger1.info("[{}] mysqld install sueccess.".format(hosts[0]['ip']))
+            logger.info("[{}] mysqld install sueccess.".format(hosts[0]['ip']))
 
-        logger2 = SimpleFunc.FileLog("mysql_2", hosts[1]['ip'])
-        logger2.info(">>>>>>>>>>>>>>> [{}] mysql slave install start. <<<<<<<<<<<<<<".format(hosts[1]['ip']))
+        logger.info(">>>>>>>>>>>>>>> [{}] mysql slave install start. <<<<<<<<<<<<<<".format(hosts[1]['ip']))
         with fabric.Connection(host=hosts[1]['ip'], port=hosts[1]['port'], user=hosts[1]['user'],
                                connect_kwargs={"password": hosts[1]['password']}, connect_timeout=10) as conn:
 
             # 安装mysql
-            rcode = self.mysqlInstall(conn, logger2)
+            rcode = self.mysqlInstall(conn, logger)
             if rcode == 0:
-                logger2.info("mysql install stop.")
+                logger.info("mysql install stop.")
                 return
             elif rcode == 1:
-                logger2.error("mysql install faild !")
+                logger.error("mysql install faild !")
                 return 1
-            logger2.info("mysql install success")
+            logger.info("mysql install success")
 
             # mysql初始化配置
             serverid = hosts[1]['ip'].split('.')[-1]
-            rcode = self.mysqlInit(conn, serverid, logger2, rootpwd, mysqlpwd)
+            rcode = self.mysqlInit(conn, serverid, logger, rootpwd, mysqlpwd)
             if rcode != None:
                 return 1
                 # 检查服务
-            self.checkMysql(conn, logger2)
+            self.checkMysql(conn, logger)
             time.sleep(5)
             # 启用slave
-            logger2.info("slave config and starting.")
+            logger.info("slave config and starting.")
             try:
                 conn.run(
                     "echo \"CHANGE MASTER TO MASTER_HOST='{}', MASTER_USER='{}', MASTER_PASSWORD='{}', MASTER_LOG_FILE='{}',MASTER_LOG_POS={};\" >/tmp/temp.sql".format(
@@ -282,11 +282,11 @@ class fabMysql():
                 conn.run("echo \"start slave;\" >> /tmp/temp.sql")
                 conn.run("mysql -h127.0.0.1 -P3306 -p'{}' -e \"source /tmp/temp.sql\"".format(rootpwd), hide=True)
             except:
-                logger2.error("slave start error!")
+                logger.error("slave start error!")
                 return 1
             finally:
                 conn.run("rm -f /tmp/temp.sql")
-            logger2.info("[{}] mysqld install success".format(hosts[1]['ip']))
+            logger.info("[{}] mysqld install success".format(hosts[1]['ip']))
 
         # 将服务信息写入文件
         with open(self.msgFile, 'a+', encoding='utf-8') as f:

@@ -13,6 +13,7 @@ class fabTengine():
         self.pkgsdir = pkgsdir
         self.pkgpath = os.path.join(pkgsdir, d['srvname'])
         hosts = d['host']
+        self.logfile = d['logfile']
         self.remotepath = "/opt/pkgs/nginx"
         self.nginxVersion = "tengine-2.3.3"
         self.luajitVersion = "LuaJIT-2.0.4"
@@ -24,10 +25,10 @@ class fabTengine():
 
     def tengineMain(self, hosts):
         l = []
+        # 日志定义
+        logger = SimpleFunc.FileLog(logfile=self.logfile)
         for host in hosts:
             l.append(host['ip'])
-            s = host['ip'].split('.')[-1]
-            logger = SimpleFunc.FileLog("tengine_{}".format(s), host['ip'])
 
             logger.info(">>>>>>>>>>>>>>>>>>>> [{}] nginx start install <<<<<<<<<<<<<<<<<<<".format(host['ip']))
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],

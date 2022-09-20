@@ -15,6 +15,7 @@ class fabZookeeper():
         self.remotepath = '/opt/pkgs/zookeeper'
         mode = d['mode']
         hosts = d['host']
+        self.logfile = d['logfile']
         dirpath = os.path.dirname(__file__)
         self.msgFile = os.path.join(os.path.dirname(dirpath), "ServerMsg.txt")
         self.zkversion = "zookeeper-3.4.14"
@@ -36,8 +37,8 @@ class fabZookeeper():
 
     def zookeeperSingle(self, host):
         upasswd = SimpleFunc.createpasswd()
-        # 日志
-        logger = SimpleFunc.FileLog("zookeeper-single", host['ip'])
+        # 日志定义
+        logger = SimpleFunc.FileLog(logfile=self.logfile)
         logger.info(">>>>>>>>>>>>>>> [{}] zookeeper install start <<<<<<<<<<<<<<".format(host['ip']))
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
@@ -104,10 +105,10 @@ class fabZookeeper():
             m += 1
         # m为myid, 重置写入文件中
         m = 1
+
+        # 日志定义
+        logger = SimpleFunc.FileLog(logfile=self.logfile)
         for host in hosts:
-            s = host['ip'].split('.')[-1]
-            # 日志
-            logger = SimpleFunc.FileLog("zkcluster-{}".format(s), host['ip'])
             logger.info(">>>>>>>>>>>>>>> [{}] zookeeper install start <<<<<<<<<<<<<<".format(host['ip']))
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:

@@ -14,6 +14,7 @@ class fabRedis():
         self.pkgpath = os.path.join(pkgsdir, d['srvname'])
         mode = d['mode']
         hosts = d['host']
+        self.logfile= d['logfile']
         self.remotepath = "/opt/pkgs/redis"
         self.datapath = "/opt/redis/data"
         self.logpath = "/var/log/redis"
@@ -117,7 +118,7 @@ class fabRedis():
 
     def redisSingle(self, host):
         # 日志定义
-        logger = SimpleFunc.FileLog("redis_single", host['ip'])
+        logger = SimpleFunc.FileLog(logfile=self.logfile)
         # 用户密码
         redispwd = SimpleFunc.createpasswd()
         # redis服务密码
@@ -188,7 +189,7 @@ class fabRedis():
         redispwd = SimpleFunc.createpasswd()
         spasswd = SimpleFunc.createpasswd()
         # 日志定义
-        logger = SimpleFunc.FileLog("rediscluster1", host['ip'])
+        logger = SimpleFunc.FileLog(logfile=self.logfile)
 
         # 连接远程机器
         logger.info(">>>>>>>>>>>>>>> redis install start <<<<<<<<<<<<<<")
@@ -271,10 +272,10 @@ class fabRedis():
         spasswd = SimpleFunc.createpasswd(length=10)
         redispwd = SimpleFunc.createpasswd(length=10)
 
+        # 日志定义
+        logger = SimpleFunc.FileLog(logfile=self.logfile)
         # 连接远程机器
         for host in hosts:
-            s = host['ip'].split('.')[-1]
-            logger = SimpleFunc.FileLog("rediscluster3_{}".format(s), host['ip'])
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 # 调用安装函数
@@ -365,10 +366,10 @@ class fabRedis():
         spasswd = SimpleFunc.createpasswd(length=10)
         redispwd = SimpleFunc.createpasswd(length=10)
 
+        # 日志定义
+        logger = SimpleFunc.FileLog(logfile=self.logfile)
         # 连接远程机器
         for host in hosts:
-            s = host['ip'].split('.')[-1]
-            logger = SimpleFunc.FileLog("rediscluster6_{}".format(s), host['ip'])
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 # 调用安装函数
@@ -424,7 +425,6 @@ class fabRedis():
                 self.checkRedis(conn, logger, port=(7000,))
 
         # 集群初始化
-        logger = SimpleFunc.FileLog("redis_cluster_six")
         conn = fabric.Connection(host=hosts[0]['ip'], port=hosts[0]['port'], user=hosts[0]['user'],
                                  connect_kwargs={"password": hosts[0]['password']}, connect_timeout=10)
         logger.info(">>>>>>>>>>>>>>> redis cluster init <<<<<<<<<<<<<<")

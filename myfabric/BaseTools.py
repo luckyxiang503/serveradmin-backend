@@ -12,6 +12,7 @@ import SimpleFunc
 dirpath = os.path.dirname(__file__)
 msgFile = os.path.join(os.path.dirname(dirpath), "ServerMsg.txt")
 
+
 def base(pkgsdir, d):
     pkgpath = os.path.join(pkgsdir, "base")
     pypkgpath = os.path.join(pkgsdir, 'pypi')
@@ -23,9 +24,11 @@ def base(pkgsdir, d):
     piptools = ['glances', 'asciinema']
 
     res = []
+
+    # 日志定义
+    logfile = d['logfile']
+    logger = SimpleFunc.FileLog(logfile=logfile)
     for host in hosts:
-        s = host['ip'].split(".")[-1]
-        logger = SimpleFunc.FileLog("base-{}".format(s), host['ip'])
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
             # 拷贝文件到远程主机

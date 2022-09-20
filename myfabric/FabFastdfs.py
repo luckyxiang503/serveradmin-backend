@@ -21,11 +21,11 @@ class fabFastdfs():
         self.fastdfs_v = "fastdfs-5.12"
         dirpath = os.path.dirname(__file__)
         self.msgFile = os.path.join(os.path.dirname(dirpath), "ServerMsg.txt")
+
+        self.fdfsMain(d)
+
+    def fdfsMain(self, d):
         hosts = d['host']
-
-        self.fdfsMain(hosts)
-
-    def fdfsMain(self, hosts):
         upasswd = SimpleFunc.createpasswd()
         tracker, storage = [], []
         T, S = [], []
@@ -38,13 +38,11 @@ class fabFastdfs():
                 storage.append(host)
                 S.append(host['ip'])
 
+        logfile = d['logfile']
+        logger = SimpleFunc.FileLog(logfile=logfile)
         for host in hosts:
-            s = host['ip'].split('.')[-1]
-            # 日志定义
-            logger = SimpleFunc.FileLog('fdfs_{}'.format(s), host['ip'])
-
             # 连接远程机器
-            logger.info(">>>>>>>>>>>>>>> fdfs install start <<<<<<<<<<<<<<")
+            logger.info(">>>>>>>>>>>>>>> [{}] fdfs install start <<<<<<<<<<<<<<".format(host['ip']))
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 # 调用安装函数
@@ -90,10 +88,6 @@ class fabFastdfs():
             conn.run("cp -f {}/fdfs_trackerd.service {}".format(self.remotepath, systempath))
 
         for host in tracker:
-            s = host['ip'].split('.')[-1]
-            # 日志定义
-            logger = SimpleFunc.FileLog('fdfs_{}'.format(s), host['ip'])
-
             # 连接远程机器
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
@@ -107,10 +101,6 @@ class fabFastdfs():
                     time.sleep(5)
 
         for host in storage:
-            s = host['ip'].split('.')[-1]
-            # 日志定义
-            logger = SimpleFunc.FileLog('fdfs_{}'.format(s), host['ip'])
-
             # 连接远程机器
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
