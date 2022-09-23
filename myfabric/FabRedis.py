@@ -8,13 +8,14 @@ import datetime
 import fabric
 import SimpleFunc
 
+from config import settings
+
 
 class fabRedis():
-    def __init__(self, pkgsdir, d):
+    def __init__(self, pkgsdir, d, logger):
         self.pkgpath = os.path.join(pkgsdir, d['srvname'])
         mode = d['mode']
         hosts = d['host']
-        self.logfile= d['logfile']
         self.remotepath = "/opt/pkgs/redis"
         self.datapath = "/opt/redis/data"
         self.logpath = "/var/log/redis"
@@ -24,23 +25,22 @@ class fabRedis():
         self.cluconfpath = "/etc/redis-cluster"
         self.redis_version = "redis-6.2.7"
         self.redis_dir = "/usr/local/{}".format(self.redis_version)
-        dirpath = os.path.dirname(__file__)
-        self.msgFile = os.path.join(os.path.dirname(dirpath), "ServerMsg.txt")
+        self.msgFile = settings.serverMsgText
 
-        self.redisMain(mode, hosts)
+        self.redisMain(mode, hosts, logger)
 
-    def redisMain(self, mode, hosts):
+    def redisMain(self, mode, hosts, logger):
         hostnum = len(hosts)
 
         # 判断部署方式 1、单机 2、单机伪集群 3、三节点集群 4、六节点集群
         if mode == "redis-single" and hostnum == 1:
-            self.redisSingle(hosts[0])
+            self.redisSingle(hosts[0], logger)
         elif mode == "redis-cluster-one" and hostnum == 1:
-            self.redisClusterOne(hosts[0])
+            self.redisClusterOne(hosts[0], logger)
         elif mode == "redis-cluster-three" and hostnum == 3:
-            self.redisClusterThree(hosts)
+            self.redisClusterThree(hosts, logger)
         elif mode == "redis-cluster-six" and hostnum == 6:
-            self.redisClusterSix(hosts)
+            self.redisClusterSix(hosts, logger)
         else:
             print("ERROR: redis model and host is not match.")
             return 1
@@ -116,16 +116,16 @@ class fabRedis():
         except Exception as e:
             logger.error(e)
 
-    def redisSingle(self, host):
-        # 日志定义
-        logger = SimpleFunc.FileLog(logfile=self.logfile)
+    def redisSingle(self, host, logger):
         # 用户密码
         redispwd = SimpleFunc.createpasswd()
         # redis服务密码
         spasswd = SimpleFunc.createpasswd(length=10)
 
         # 连接远程机器
-        logger.info(">>>>>>>>>>>>>>> redis install start <<<<<<<<<<<<<<")
+        logger.info("=" * 40)
+        logger.info("[{}] redis install start......".format(host['ip']))
+        logger.info("=" * 40)
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
             # 调用安装函数
@@ -166,8 +166,7 @@ class fabRedis():
             logger.info("redis server start success.")
 
             # 检查服务
-            self.checkRedis(conn, logger)
-            conn.close()
+            # self.checkRedis(conn, logger)
 
         # 将服务信息写入文件
         logger.info("redis msg write to ServerMsg.txt")
@@ -183,16 +182,15 @@ class fabRedis():
             f.write("logpath: {}\n".format(self.logpath))
             f.write("datapath: {}\n\n".format(self.datapath))
 
-    def redisClusterOne(self, host):
+    def redisClusterOne(self, host, logger):
         remotepath = self.remotepath
-        datapath = self.datapath
         redispwd = SimpleFunc.createpasswd()
         spasswd = SimpleFunc.createpasswd()
-        # 日志定义
-        logger = SimpleFunc.FileLog(logfile=self.logfile)
 
         # 连接远程机器
-        logger.info(">>>>>>>>>>>>>>> redis install start <<<<<<<<<<<<<<")
+        logger.info("=" * 40)
+        logger.info("[{}] redis install start......".format(host['ip']))
+        logger.info("=" * 40)
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
             # 调用安装函数
@@ -246,13 +244,14 @@ class fabRedis():
             # 集群初始化
             logger.info(">>>>>>>>>>>>>>> redis cluster init <<<<<<<<<<<<<<")
             try:
-                conn.run("echo yes | {2}/bin/redis-cli --cluster create {0}:7000 {0}:7001 {0}:7002 {0}:7003 {0}:7004 {0}:7005 --cluster-replicas 1 -a '{1}'".format(host['ip'], spasswd, self.redis_dir))
+                r = conn.run("echo yes | {2}/bin/redis-cli --cluster create {0}:7000 {0}:7001 {0}:7002 {0}:7003 {0}:7004 {0}:7005 --cluster-replicas 1 -a '{1}'".format(host['ip'], spasswd, self.redis_dir), hide=True)
+                logger.info(r.stdout)
             except:
                 logger.error("redis cluster init error.")
                 return 1
 
             # 检查服务
-            self.checkRedis(conn, logger, port=(7000, 7001, 7002, 7003, 7004, 7005))
+            # self.checkRedis(conn, logger, port=(7000, 7001, 7002, 7003, 7004, 7005))
 
         # 将相关信息存入文件中
         logger.info("redis msg write to ServerMsg.txt")
@@ -268,14 +267,15 @@ class fabRedis():
             f.write("logpath: {}/[7000-7005]\n".format(self.clulogpath))
             f.write("datapath: {}/[7000-7005]\n\n".format(self.cludatapath))
 
-    def redisClusterThree(self, hosts):
+    def redisClusterThree(self, hosts, logger):
         spasswd = SimpleFunc.createpasswd(length=10)
         redispwd = SimpleFunc.createpasswd(length=10)
 
-        # 日志定义
-        logger = SimpleFunc.FileLog(logfile=self.logfile)
         # 连接远程机器
         for host in hosts:
+            logger.info("=" * 40)
+            logger.info("[{}] redis install start......".format(host['ip']))
+            logger.info("=" * 40)
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 # 调用安装函数
@@ -332,17 +332,17 @@ class fabRedis():
                 logger.info("redis server start success.")
 
                 # 检查服务
-                self.checkRedis(conn, logger, port=(7000, 7001))
+                # self.checkRedis(conn, logger, port=(7000, 7001))
 
         # 集群初始化
-        logger = SimpleFunc.FileLog("redis_cluster_three")
         conn = fabric.Connection(host=hosts[0]['ip'], port=hosts[0]['port'], user=hosts[0]['user'],
                                  connect_kwargs={"password": hosts[0]['password']}, connect_timeout=10)
         logger.info(">>>>>>>>>>>>>>> redis cluster init <<<<<<<<<<<<<<")
         try:
-            conn.run(
+            r = conn.run(
                 "echo yes | {4}/bin/redis-cli --cluster create {0}:7000 {0}:7001 {1}:7000 {1}:7001 {2}:7000 {2}:7001 --cluster-replicas 1 -a '{3}'".format(
-                    hosts[0]['ip'], hosts[1]['ip'], hosts[2]['ip'], spasswd, self.redis_dir))
+                    hosts[0]['ip'], hosts[1]['ip'], hosts[2]['ip'], spasswd, self.redis_dir), hide=True)
+            logger.info(r.stdout)
         except:
             logger.error("redis cluster init error.")
             return 1
@@ -360,16 +360,16 @@ class fabRedis():
             f.write("logpath: {}/[7000-7001]\n".format(self.clulogpath))
             f.write("datapath: {}/[7000-7001]\n\n".format(self.cludatapath))
 
-    def redisClusterSix(self, hosts):
+    def redisClusterSix(self, hosts, logger):
         remotepath = self.remotepath
-        datapath = self.datapath
         spasswd = SimpleFunc.createpasswd(length=10)
         redispwd = SimpleFunc.createpasswd(length=10)
 
-        # 日志定义
-        logger = SimpleFunc.FileLog(logfile=self.logfile)
         # 连接远程机器
         for host in hosts:
+            logger.info("=" * 40)
+            logger.info("[{}] redis install start......".format(host['ip']))
+            logger.info("=" * 40)
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 # 调用安装函数
@@ -422,16 +422,17 @@ class fabRedis():
                 logger.info("redis server start success.")
 
                 # 检查服务
-                self.checkRedis(conn, logger, port=(7000,))
+                # self.checkRedis(conn, logger, port=(7000,))
 
         # 集群初始化
         conn = fabric.Connection(host=hosts[0]['ip'], port=hosts[0]['port'], user=hosts[0]['user'],
                                  connect_kwargs={"password": hosts[0]['password']}, connect_timeout=10)
         logger.info(">>>>>>>>>>>>>>> redis cluster init <<<<<<<<<<<<<<")
         try:
-            conn.run(
+            r = conn.run(
                 "echo yes | {7}/bin/redis-cli --cluster create {0}:7000 {1}:7000 {2}:7000 {3}:7000 {4}:7000 {5}:7000 --cluster-replicas 1 -a '{6}'".format(
-                    hosts[0]['ip'], hosts[1]['ip'], hosts[2]['ip'], hosts[3]['ip'], hosts[4]['ip'], hosts[5]['ip'], spasswd, self.redis_dir))
+                    hosts[0]['ip'], hosts[1]['ip'], hosts[2]['ip'], hosts[3]['ip'], hosts[4]['ip'], hosts[5]['ip'], spasswd, self.redis_dir), hide=True)
+            logger.info(r.stdout)
         except:
             logger.error("redis cluster init error.")
             return 1

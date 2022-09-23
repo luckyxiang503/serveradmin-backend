@@ -9,22 +9,22 @@ import time
 import fabric
 
 import SimpleFunc
+from config import settings
 
 
 class fabFastdfs():
-    def __init__(self, pkgsdir, d):
+    def __init__(self, pkgsdir, d, logger):
         self.pkgpath = os.path.join(pkgsdir, d['srvname'])
         self.remotepath = "/opt/pkgs/fdfs"
         self.datapath = "/data/fdfs"
         self.confpath = "/etc/fdfs"
         self.libfastcommon_v = "libfastcommon-1.0.42"
         self.fastdfs_v = "fastdfs-5.12"
-        dirpath = os.path.dirname(__file__)
-        self.msgFile = os.path.join(os.path.dirname(dirpath), "ServerMsg.txt")
+        self.msgFile = settings.serverMsgText
 
-        self.fdfsMain(d)
+        self.fdfsMain(d, logger)
 
-    def fdfsMain(self, d):
+    def fdfsMain(self, d, logger):
         hosts = d['host']
         upasswd = SimpleFunc.createpasswd()
         tracker, storage = [], []
@@ -38,11 +38,11 @@ class fabFastdfs():
                 storage.append(host)
                 S.append(host['ip'])
 
-        logfile = d['logfile']
-        logger = SimpleFunc.FileLog(logfile=logfile)
         for host in hosts:
             # 连接远程机器
-            logger.info(">>>>>>>>>>>>>>> [{}] fdfs install start <<<<<<<<<<<<<<".format(host['ip']))
+            logger.info("=" * 40)
+            logger.info("[{}] fdfs install start......".format(host['ip']))
+            logger.info("=" * 40)
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 # 调用安装函数
@@ -67,8 +67,10 @@ class fabFastdfs():
 
             # 拷贝文件
             logger.info("copy config file...")
-            conn.run("[ -f {0}/storage.conf ] && mv {0}/storage.conf {0}/storage.conf_`date +%F%H%M%S`".format(self.confpath), warn=True)
-            conn.run("[ -f {0}/tracker.conf ] && mv {0}/tracker.conf {0}/tracker.conf_`date +%F%H%M%S`".format(self.confpath), warm=True)
+            conn.run("[ -f {0}/storage.conf ] && mv {0}/storage.conf {0}/storage.conf_`date +%F%H%M%S`".format(
+                self.confpath), warn=True)
+            conn.run("[ -f {0}/tracker.conf ] && mv {0}/tracker.conf {0}/tracker.conf_`date +%F%H%M%S`".format(
+                self.confpath), warm=True)
             conn.run("cp -f {}/storage.conf {}".format(self.remotepath, self.confpath))
             conn.run("cp -f {}/tracker.conf {}".format(self.remotepath, self.confpath))
 
@@ -82,8 +84,12 @@ class fabFastdfs():
 
             logger.info("copy service file...")
             systempath = "/lib/systemd/system"
-            conn.run("[ -f {0}/fdfs_storaged.service ] && mv {0}/fdfs_storaged.service {0}/fdfs_storaged.service_`date +%F%H%M%S`".format(systempath), warn=True)
-            conn.run("[ -f {0}/fdfs_trackerd.service ] && mv {0}/fdfs_trackerd.service {0}/fdfs_trackerd.service_`date +%F%H%M%S`".format(systempath), warn=True)
+            conn.run(
+                "[ -f {0}/fdfs_storaged.service ] && mv {0}/fdfs_storaged.service {0}/fdfs_storaged.service_`date +%F%H%M%S`".format(
+                    systempath), warn=True)
+            conn.run(
+                "[ -f {0}/fdfs_trackerd.service ] && mv {0}/fdfs_trackerd.service {0}/fdfs_trackerd.service_`date +%F%H%M%S`".format(
+                    systempath), warn=True)
             conn.run("cp -f {}/fdfs_storaged.service {}".format(self.remotepath, systempath))
             conn.run("cp -f {}/fdfs_trackerd.service {}".format(self.remotepath, systempath))
 
@@ -91,7 +97,7 @@ class fabFastdfs():
             # 连接远程机器
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
-                logger.info(">>>>>>>>>>>>>>> systemctl start fdfs_trackerd <<<<<<<<<<<<<<<")
+                logger.info(">>>>> systemctl start fdfs_trackerd <<<<<")
                 try:
                     conn.run("systemctl daemon-reload", hide=True)
                     conn.run("systemctl start fdfs_trackerd", hide=True)
@@ -104,7 +110,7 @@ class fabFastdfs():
             # 连接远程机器
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
-                logger.info(">>>>>>>>>>>>>>> systemctl start fdfs_storaged <<<<<<<<<<<<<<<")
+                logger.info(">>>>> systemctl start fdfs_storaged <<<<<<")
                 try:
                     conn.run("systemctl daemon-reload", hide=True)
                     conn.run("systemctl start fdfs_storaged", hide=True)
@@ -116,7 +122,7 @@ class fabFastdfs():
         # 将服务信息写入文件
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  fdfs server  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+            f.write(">>>>> fdfs server <<<<<\n")
             f.write("time: {}\n".format(dtime))
             f.write("system user: fdfs password: {}\n".format(upasswd))
             f.write("tracker server: {}:22122\n".format(":22122 ".join(T)))
@@ -124,7 +130,7 @@ class fabFastdfs():
 
     def fdfsInstall(self, conn, logger):
         # 检查是否已经安装
-        logger.info(">>>>>>>>>>>>>> check fdfs server isn't installed <<<<<<<<<<<<<")
+        logger.info(">>>>> check fdfs server isn't installed <<<<<")
         r = conn.run("which fdfs_trackerd && which fdfs_storaged", warn=True, hide=True)
         if r.exited == 0:
             logger.info("fdfs is installed, please check it.")
@@ -148,7 +154,7 @@ class fabFastdfs():
                 conn.put(localfile, rpath)
 
         # 安装fdfs
-        logger.info(">>>>>>>>>>>>>>>>>> start install fdfs <<<<<<<<<<<<<<<<<<<<")
+        logger.info(">>>>> start install fdfs <<<<<")
         with conn.cd(self.remotepath):
             conn.run("tar -xf {}/{}.tar.gz".format(self.remotepath, self.libfastcommon_v), hide=True)
             conn.run("tar -xf {}/{}.tar.gz".format(self.remotepath, self.fastdfs_v), hide=True)

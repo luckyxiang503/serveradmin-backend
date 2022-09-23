@@ -24,9 +24,9 @@ def createpasswd(length=10):
     return new_passwd
 
 
-def FileLog(logfile, loglevel=logging.INFO):
+def FileLog(name, logfile, loglevel=logging.INFO):
     # 创建logger对象
-    logger = logging.getLogger('FabricServer')
+    logger = logging.getLogger(name)
     # 清空 handler,避免重复输出
     logger.handlers = []
     # 设置日志等级
@@ -40,7 +40,7 @@ def FileLog(logfile, loglevel=logging.INFO):
     fh2 = logging.FileHandler(logfile2)
     fh2.setLevel(loglevel)
     # 定义输出格式
-    formatter = logging.Formatter('[%(asctime)s] [%(funcName)s] [%(levelname)s]: %(message)s')
+    formatter = logging.Formatter('[%(asctime)s] [%(thread)d-%(funcName)s] [%(levelname)s]: %(message)s')
 
     fh1.setFormatter(formatter)
     fh2.setFormatter(formatter)
@@ -52,9 +52,9 @@ def FileLog(logfile, loglevel=logging.INFO):
     return logger
 
 
-def StreamLog(loglevel=logging.DEBUG):
+def StreamLog(name, loglevel=logging.DEBUG):
     # 创建logger对象
-    logger = logging.getLogger('FabricServer')
+    logger = logging.getLogger(name)
     # 清空 handler,避免重复输出
     logger.handlers = []
     # 设置日志等级
@@ -63,7 +63,7 @@ def StreamLog(loglevel=logging.DEBUG):
     ch = logging.StreamHandler()
     ch.setLevel(loglevel)
     # 定义输出格式
-    formatter = logging.Formatter('[%(asctime)s] [%(funcName)s] [%(levelname)s]: %(message)s')
+    formatter = logging.Formatter('[%(asctime)s] [%(thread)d-%(funcName)s] [%(levelname)s]: %(message)s')
 
     ch.setFormatter(formatter)
     # 将对应的handler添加到logger对象中

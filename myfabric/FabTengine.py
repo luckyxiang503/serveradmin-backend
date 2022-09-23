@@ -8,25 +8,25 @@ import datetime
 import fabric
 import SimpleFunc
 
+from config import settings
+
+
 class fabTengine():
-    def __init__(self, pkgsdir, d):
+    def __init__(self, pkgsdir, d, logger):
         self.pkgsdir = pkgsdir
         self.pkgpath = os.path.join(pkgsdir, d['srvname'])
         hosts = d['host']
-        self.logfile = d['logfile']
         self.remotepath = "/opt/pkgs/nginx"
         self.nginxVersion = "tengine-2.3.3"
         self.luajitVersion = "LuaJIT-2.0.4"
         self.nginxPath = "/usr/local/nginx"
-        dirpath = os.path.dirname(__file__)
-        self.msgFile = os.path.join(os.path.dirname(dirpath), "ServerMsg.txt")
+        self.msgFile = settings.serverMsgText
 
-        self.tengineMain(hosts)
+        self.tengineMain(hosts, logger)
 
-    def tengineMain(self, hosts):
+    def tengineMain(self, hosts, logger):
         l = []
-        # 日志定义
-        logger = SimpleFunc.FileLog(logfile=self.logfile)
+
         for host in hosts:
             l.append(host['ip'])
 

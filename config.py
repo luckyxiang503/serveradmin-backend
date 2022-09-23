@@ -2,6 +2,7 @@ import os
 from pydantic import BaseSettings
 import secrets
 
+basedir = os.path.abspath(os.path.dirname(__file__))
 
 class Settings(BaseSettings):
     # 数据库相关
@@ -21,8 +22,10 @@ class Settings(BaseSettings):
     # 服务安装相关
     pkgsdir = r"E:\python\fabric\pkgs"
 
-    basedir = os.path.abspath(os.path.dirname(__file__))
     logpath = os.path.join(basedir, 'logs')
     logfile = os.path.join(logpath, 'server.log')
+
+    serverMsgText = os.path.join(logpath, "ServerMsg.txt")
+
 
 settings = Settings()

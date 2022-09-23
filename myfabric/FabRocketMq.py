@@ -3,18 +3,23 @@
     @Author    : xiang
     @CreateTime: 2022/8/8 17:39
 '''
+import datetime
 import os
-import time, datetime
+import time
+
 import fabric
-import SimpleFunc, FabSpring
+
+import FabSpring
+import SimpleFunc
+from config import settings
+
 
 class fabRocketmq():
-    def __init__(self, pkgsdir, d):
+    def __init__(self, pkgsdir, d, logger):
         self.pkgsdir = pkgsdir
         self.pkgpath = os.path.join(pkgsdir, d['srvname'])
         mode = d['mode']
         hosts = d['host']
-        self.logfile = d['logfile']
         self.remotepath = "/opt/pkgs/rocketmq"
         self.rocketmqPath = "/opt/rocketMQ"
         self.datapath = "/opt/rocketMQ/data"
@@ -26,18 +31,17 @@ class fabRocketmq():
         self.xmx = "1g"
         self.xmn = "512m"
         self.JAVAHOME = "/usr/local/jdk1.8.0_341"
-        dirpath = os.path.dirname(__file__)
-        self.msgFile = os.path.join(os.path.dirname(dirpath), "ServerMsg.txt")
+        self.msgFile = settings.serverMsgText
 
-        self.rocketmqMain(mode, hosts)
+        self.rocketmqMain(mode, hosts, logger)
 
-    def rocketmqMain(self, mode, hosts):
+    def rocketmqMain(self, mode, hosts, logger):
         hostnum = len(hosts)
 
         if mode == 'rocketmq-single' and hostnum == 1:
-            self.rocketmqSingle(hosts[0])
+            self.rocketmqSingle(hosts[0], logger)
         elif mode == 'rocketmq-nM' and hostnum > 1:
-            self.rocketmqnM(hosts)
+            self.rocketmqnM(hosts, logger)
         else:
             print("ERROR: rocketMQ mode is not true.")
             return 1
@@ -124,10 +128,7 @@ class fabRocketmq():
         except:
             logger.error("rocketMQ check fiald!")
 
-    def rocketmqSingle(self, host):
-        # 日志定义
-        logger = SimpleFunc.FileLog(logfile=self.logfile)
-
+    def rocketmqSingle(self, host, logger):
         logger.info(">>>>>>>>>>>>>>>>>>>> [{}] rocketmq start install <<<<<<<<<<<<<<<<<<<".format(host['ip']))
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
@@ -174,7 +175,7 @@ class fabRocketmq():
                 logger.error("rocketMQ server start faild!")
                 return 1
 
-            self.checkRocketmq(conn, logger)
+            # self.checkRocketmq(conn, logger)
         # 将相关信息存入文件中
         logger.info("redis msg write to ServerMsg.txt")
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
@@ -189,7 +190,7 @@ class fabRocketmq():
             f.write("logpath: {}\n".format(self.logpath))
             f.write("datapath: {}\n\n".format(self.datapath))
 
-    def rocketmqnM(self, hosts):
+    def rocketmqnM(self, hosts, logger):
         upasswd = SimpleFunc.createpasswd()
         namesrvaddr = ""
         brokeraddr = ""
@@ -202,10 +203,7 @@ class fabRocketmq():
             host['SelfId'] = m
             m += 1
 
-        # 日志定义
-        logger = SimpleFunc.FileLog(logfile=self.logfile)
         for host in hosts:
-
             logger.info(">>>>>>>>>>>>>>>>>>>> [{}] rocketmq start install <<<<<<<<<<<<<<<<<<<".format(host['ip']))
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
@@ -257,7 +255,7 @@ class fabRocketmq():
                     return 1
                 time.sleep(5)
 
-                self.checkRocketmq(conn, logger)
+                # self.checkRocketmq(conn, logger)
                 # 将相关信息存入文件中
 
         with open(self.msgFile, 'a+', encoding='utf-8') as f:

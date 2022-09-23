@@ -3,42 +3,43 @@
     @Author    : xiang
     @CreateTime: 2022/8/22 16:55
 '''
+import datetime
 import os
-import time, datetime
 import fabric
-import SimpleFunc, FabSpring
+
+import FabSpring
+import SimpleFunc
+from config import settings
+
 
 class fabZookeeper():
-    def __init__(self, pkgsdir, d):
+    def __init__(self, pkgsdir, d, logger):
         self.pkgsdir = pkgsdir
         self.pkgpath = os.path.join(pkgsdir, d['srvname'])
         self.remotepath = '/opt/pkgs/zookeeper'
         mode = d['mode']
         hosts = d['host']
-        self.logfile = d['logfile']
-        dirpath = os.path.dirname(__file__)
-        self.msgFile = os.path.join(os.path.dirname(dirpath), "ServerMsg.txt")
         self.zkversion = "zookeeper-3.4.14"
         self.pkgname = "zookeeper-3.4.14.tar.gz"
         self.zkpath = "/opt/zookeeper"
+        self.msgFile = settings.serverMsgText
 
-        self.zookeeperMain(mode, hosts)
+        self.zookeeperMain(mode, hosts, logger)
 
-    def zookeeperMain(self, mode, hosts):
+    def zookeeperMain(self, mode, hosts, logger):
         hostnum = len(hosts)
 
         if mode == 'zookeeper-single' and hostnum == 1:
-            self.zookeeperSingle(hosts[0])
+            self.zookeeperSingle(hosts[0], logger)
         elif mode == 'zookeeper-cluster' and hostnum >= 3:
-            self.zookeeperCluster(hosts)
+            self.zookeeperCluster(hosts, logger)
         else:
             print("ERROR: rocketMQ mode is not true.")
             return 1
 
-    def zookeeperSingle(self, host):
+    def zookeeperSingle(self, host, logger):
         upasswd = SimpleFunc.createpasswd()
-        # 日志定义
-        logger = SimpleFunc.FileLog(logfile=self.logfile)
+
         logger.info(">>>>>>>>>>>>>>> [{}] zookeeper install start <<<<<<<<<<<<<<".format(host['ip']))
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
@@ -77,7 +78,7 @@ class fabZookeeper():
                 return 1
             logger.info("start zookeeper server success.")
             # 检查服务
-            self.zookeeperCheck(conn, logger)
+            # self.zookeeperCheck(conn, logger)
 
         # 将服务信息写入文件
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
@@ -90,7 +91,7 @@ class fabZookeeper():
             f.write("zookeeper path: {}\n\n".format(self.zkpath))
 
 
-    def zookeeperCluster(self, hosts):
+    def zookeeperCluster(self, hosts, logger):
         upasswd = SimpleFunc.createpasswd()
         m = 1
         n = []
@@ -106,8 +107,6 @@ class fabZookeeper():
         # m为myid, 重置写入文件中
         m = 1
 
-        # 日志定义
-        logger = SimpleFunc.FileLog(logfile=self.logfile)
         for host in hosts:
             logger.info(">>>>>>>>>>>>>>> [{}] zookeeper install start <<<<<<<<<<<<<<".format(host['ip']))
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],

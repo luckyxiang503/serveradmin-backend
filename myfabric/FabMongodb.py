@@ -8,9 +8,11 @@ import datetime
 import fabric
 import SimpleFunc
 
+from config import settings
+
 
 class fabMongodb():
-    def __init__(self, pkgsdir, d):
+    def __init__(self, pkgsdir, d, logger):
         self.pkgpath = os.path.join(pkgsdir, d['srvname'])
         self.remotepath = "/opt/pkgs/mongodb"
         self.installpath = "/usr/local/mongodb"
@@ -22,29 +24,25 @@ class fabMongodb():
         self.clulogpath = "/var/log/mongod-cluster"
         self.mongopkgname = "mongodb-linux-x86_64-rhel70-5.0.10"
         self.mongoshellpkgname = "mongodb-shell-linux-x86_64-rhel70-5.0.10"
-        dirpath = os.path.dirname(__file__)
-        self.msgFile = os.path.join(os.path.dirname(dirpath), "ServerMsg.txt")
+        self.msgFile = settings.serverMsgText
 
-        self.mongodbMain(d)
+        self.mongodbMain(d, logger)
 
-    def mongodbMain(self, d):
+    def mongodbMain(self, d, logger):
         mode = d['mode']
         hosts = d['host']
         hostnum = len(hosts)
-        logfile = d['logfile']
 
         if mode == "mongodb-single" and hostnum == 1:
-            self.mongodbSingle(hosts[0], logfile)
+            self.mongodbSingle(hosts[0], logger)
         elif mode == "mongodb-sharding":
-            self.mongodbSharding(hosts, logfile)
+            self.mongodbSharding(hosts, logger)
         else:
             print("ERROR: host num or mode is not true!")
             return 1
 
-    def mongodbSingle(self, host, logfile):
+    def mongodbSingle(self, host, logger):
         mongodpwd = SimpleFunc.createpasswd()
-        # 日志定义
-        logger = SimpleFunc.FileLog(logfile=logfile)
 
         # 连接远程机器
         logger.info(">>>>>>>>>>>>>>> mongodb install start <<<<<<<<<<<<<<")
@@ -101,15 +99,16 @@ class fabMongodb():
             f.write("logpath: {}\n".format(self.logpath))
             f.write("datapath: {}\n\n".format(self.datapath))
 
-    def mongodbSharding(self, hosts, logfile):
+    def mongodbSharding(self, hosts, logger):
         mongodpwd = SimpleFunc.createpasswd()
 
-        # 日志定义
-        logger = SimpleFunc.FileLog(logfile=logfile)
-
-        H = []
+        H, C = [], []
         for host in hosts:
             H.append(host['ip'])
+            C.append("{}:27000".format(host['ip']))
+        configDB = "config/{}".format(",".join(C))
+
+        for host in hosts:
             # 连接远程机器
             logger.info(">>>>>>>>>>>>>> [{}] mongodb install start <<<<<<<<<<<<<<".format(host['ip']))
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],

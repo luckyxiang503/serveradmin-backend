@@ -1,63 +1,62 @@
 from datetime import datetime
+from myfabric import SimpleFunc
 
 from config import settings
 from myfabric import *
-from crud.server import get_uninstall_server, update_server
+from crud.server import update_server
+from schemas.server import ServerInstall
 
 
-def install_server():
-    # 获取未安装服务信息
-    servers = get_uninstall_server()
-
-    if len(servers) == 0:
-        return False
-
-    for srv in servers:
-        if srv.logfile == '':
-            logfile = "id{}{}{}.log".format(srv.id, srv.srvname, datetime.now().strftime("%Y%m%d%H%M%S"))
-            srv.logfile = logfile
-            update_server(srv.id, status=1, logfile=logfile)
-        else:
-            update_server(srv.id, status=1)
-        # 调用安装函数
-        if fabric_install(srv):
-            update_server(srv.id, status=2)
-        else:
-            update_server(srv.id, status=3)
+def install_server(srv: ServerInstall):
+    if not os.path.exists(settings.logpath):
+        os.mkdir(settings.logpath)
+    if srv.logfile == '':
+        logfile = "{}id{}_{}.log".format(srv.srvname, srv.id, datetime.now().strftime("%Y%m%d%H%M%S"))
+        srv.logfile = logfile
+        update_server(srv.id, status=1, logfile=logfile)
+    else:
+        update_server(srv.id, status=1)
+    # 调用安装函数
+    if fabric_install(srv):
+        update_server(srv.id, status=2)
+    else:
+        update_server(srv.id, status=3)
 
 
 def fabric_install(srv):
+    logger = SimpleFunc.FileLog(name="{}_{}".format(srv.srvname, srv.id), logfile=srv.logfile)
     pkgsdir = settings.pkgsdir
     s = srv.dict()
     try:
         if srv.srvname == 'base':
-            rcode = BaseTools.base(pkgsdir, s)
+            BaseTools.base(pkgsdir, s, logger)
         elif srv.srvname == "redis":
-            rcode = FabRedis.fabRedis(pkgsdir, s)
+            FabRedis.fabRedis(pkgsdir, s, logger)
         elif srv.srvname == "mysql":
-            rcode = FabMysql.fabMysql(pkgsdir, s)
+            FabMysql.fabMysql(pkgsdir, s, logger)
         elif srv.srvname == 'rocketmq':
-            rcode = FabRocketMq.fabRocketmq(pkgsdir, s)
+            FabRocketMq.fabRocketmq(pkgsdir, s, logger)
         elif srv.srvname == 'jdk':
-            rcode = FabSpring.jdkMain(pkgsdir, s)
+            FabSpring.jdkMain(pkgsdir, s, logger)
         elif srv.srvname == 'app':
-            rcode = FabSpring.appinit(pkgsdir, s)
+            FabSpring.appinit(pkgsdir, s, logger)
         elif srv.srvname == 'nginx':
-            rcode = FabTengine.fabTengine(pkgsdir, s)
+            FabTengine.fabTengine(pkgsdir, s, logger)
         elif srv.srvname == 'mongodb':
-            rcode = FabMongodb.fabMongodb(pkgsdir, s)
+            FabMongodb.fabMongodb(pkgsdir, s, logger)
         elif srv.srvname == 'nacos':
-            rcode = FabNacos.fabNacos(pkgsdir, s)
+            FabNacos.fabNacos(pkgsdir, s, logger)
         elif srv.srvname == 'zookeeper':
-            rcode = FabZookeeper.fabZookeeper(pkgsdir, s)
+            FabZookeeper.fabZookeeper(pkgsdir, s, logger)
         elif srv.srvname == 'fdfs':
-            rcode = FabZookeeper.fabZookeeper(pkgsdir, s)
+            FabFastdfs.fabFastdfs(pkgsdir, s, logger)
         else:
             raise "srvname not true"
-    except:
+    except Exception as e:
+        logger.error("ERROR: {}".format(e))
         return False
+    logger.info("=" * 40)
+    logger.info("{} install finished.".format(srv.srvname))
+    logger.info("=" * 40)
+    return True
 
-    if rcode == None:
-        return True
-    else:
-        return False

@@ -9,29 +9,29 @@ import time, datetime
 import fabric
 import SimpleFunc
 
+from config import settings
+
 
 class fabMysql():
-    def __init__(self, pkgsdir, d):
+    def __init__(self, pkgsdir, d, logger):
         self.pkgpath = os.path.join(pkgsdir, d['srvname'])
         mode = d['mode']
         hosts = d['host']
-        self.logfile = d['logfile']
         self.remotepath = "/opt/pkgs/mysql"
         self.perconapath = "/opt/pkgs/mysql/percona"
         self.datapath = "/data/mysql"
-        dirpath = os.path.dirname(__file__)
-        self.msgFile = os.path.join(os.path.dirname(dirpath), "ServerMsg.txt")
+        self.msgFile = settings.serverMsgText
 
-        self.mysqlMain(mode, hosts)
+        self.mysqlMain(mode, hosts, logger)
 
-    def mysqlMain(self, mode, hosts):
+    def mysqlMain(self, mode, hosts, logger):
         hostNum = len(hosts)
 
         # 判断部署方式
         if mode == "mysql-single" and hostNum == 1:
-            self.mysqlSingle(hosts[0])
+            self.mysqlSingle(hosts[0], logger)
         elif mode == "mysql-1M1S" and hostNum == 2:
-            self.mysql1M1S(hosts)
+            self.mysql1M1S(hosts, logger)
         else:
             print("ERROR: mysql host num is not true.")
             return 1
@@ -143,10 +143,7 @@ class fabMysql():
         except:
             logger.error("mysql server check error!")
 
-    def mysqlSingle(self, host):
-        # 日志定义
-        logger = SimpleFunc.FileLog(logfile=self.logfile)
-
+    def mysqlSingle(self, host, logger):
         # 系统用户账号密码
         mysqlpwd = SimpleFunc.createpasswd()
         # mysql用户账号密码
@@ -190,10 +187,7 @@ class fabMysql():
             f.write("logpath: {}/logs\n".format(self.datapath))
             f.write("datapath: {}/data\n\n".format(self.datapath))
 
-    def mysql1M1S(self, hosts):
-        # 日志定义
-        logger = SimpleFunc.FileLog(logfile=self.logfile)
-
+    def mysql1M1S(self, hosts, logger):
         # 系统用户密码
         mysqlpwd = SimpleFunc.createpasswd()
         # mysql用户账号密码
@@ -203,6 +197,11 @@ class fabMysql():
         # 判断master与slave
         if hosts[0]['role'] == 'slave' and hosts[1]['role'] == 'master':
             hosts.reverse()
+        elif hosts[0]['role'] == 'master' and hosts[1]['role'] == 'slave':
+            pass
+        else:
+            logger.error("mysql cluster need hava master and slave.")
+            return 1
 
         logger.info(">>>>>>>>>>>>>>> [{}] mysql master install start. <<<<<<<<<<<<<<".format(hosts[0]['ip']))
         with fabric.Connection(host=hosts[0]['ip'], port=hosts[0]['port'], user=hosts[0]['user'],

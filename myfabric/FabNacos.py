@@ -3,46 +3,43 @@
     @Author    : xiang
     @CreateTime: 2022/8/15 16:47
 '''
-import logging
 import os
 import datetime
 import time
 
 import fabric
 import SimpleFunc, FabSpring
+from config import settings
 
 
 class fabNacos():
-    def __init__(self, pkgsdir, d):
+    def __init__(self, pkgsdir, d, logger):
         self.pkgsdir = pkgsdir
         hosts = d['host']
         mode = d['mode']
-        self.logfile = d['logfile']
         self.pkgpath = os.path.join(pkgsdir, d['srvname'])
         self.remotepath = "/opt/pkgs/nacos"
         self.nacospath = "/opt/nacos"
         self.nacospkgname = "nacos-server-2.1.1.tar.gz"
         self.JAVAHOME = "/usr/local/jdk1.8.0_341"
-        dirpath = os.path.dirname(__file__)
-        self.msgFile = os.path.join(os.path.dirname(dirpath), "ServerMsg.txt")
+        self.msgFile = settings.serverMsgText
 
-        self.nacosMain(mode, hosts)
+        self.nacosMain(mode, hosts, logger)
 
-    def nacosMain(self, mode, hosts):
+    def nacosMain(self, mode, hosts, logger):
         hostnum = len(hosts)
         if mode == 'nacos-single' and hostnum == 1:
-            self.nacosSingle(hosts[0])
+            self.nacosSingle(hosts[0], logger)
         elif mode == 'nacos-cluster' and hostnum >= 3:
-            self.nacosCluster(hosts)
+            self.nacosCluster(hosts, logger)
         else:
             print("ERROR: nacos mode or host num not true!")
             return 1
 
-    def nacosSingle(self, host):
-        # 日志定义
-        logger = SimpleFunc.FileLog(logfile=self.logfile)
-
-        logger.info(">>>>>>>>>>>>>>> [{}] nacos install start <<<<<<<<<<<<<<".format(host['ip']))
+    def nacosSingle(self, host, logger):
+        logger.info("=" * 40)
+        logger.info("[{}] nacos install......".format(host['ip']))
+        logger.info("=" * 40)
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
             # 调用安装函数
@@ -92,17 +89,16 @@ class fabNacos():
             f.write("nacos path: {}\n".format(self.nacospath))
 
 
-    def nacosCluster(self, hosts):
+    def nacosCluster(self, hosts, logger):
         l = []
         upasswd = SimpleFunc.createpasswd()
         for host in hosts:
             l.append(host['ip'])
 
-        # 日志定义
-        logger = SimpleFunc.FileLog(logfile=self.logfile)
-
         for host in hosts:
-            logger.info(">>>>>>>>>>>>>>> [{}] nacos install start <<<<<<<<<<<<<<".format(host['ip']))
+            logger.info("=" * 40)
+            logger.info("[{}] nacos install......".format(host['ip']))
+            logger.info("=" * 40)
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 # 调用安装函数

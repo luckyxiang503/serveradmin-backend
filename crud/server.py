@@ -33,29 +33,26 @@ def save_server_info(servers: List[server.Server]):
         db.close()
 
 
-def get_uninstall_server():
+def get_serverinfo_by_id(srvid: int):
     """
-    获取所有server信息
-    :return: List[ServerInstall]
+    获取server信息
+    :return: ServerInstall
     """
-    serverlist = []
     with SessionLocal() as db:
-        servers = db.query(Server).filter_by(status=0).all()
-        for s in servers:
-            hosts = []
-            for host in s.serverhost:
-                hosts.append(server.Host(ip=host.hosts.host,
-                                         port=host.hosts.port,
-                                         user=host.hosts.user,
-                                         password=host.hosts.password,
-                                         role=host.role))
-            d = server.ServerInstall(id=s.id,
-                                     srvname=s.srvname,
-                                     mode=s.mode,
-                                     host=hosts,
-                                     logfile=s.logfile)
-            serverlist.append(d)
-        return serverlist
+        s = db.query(Server).filter_by(id=srvid).first()
+        hosts = []
+        for host in s.serverhost:
+            hosts.append(server.Host(ip=host.hosts.host,
+                                     port=host.hosts.port,
+                                     user=host.hosts.user,
+                                     password=host.hosts.password,
+                                     role=host.role))
+        srv = server.ServerInstall(id=s.id,
+                                 srvname=s.srvname,
+                                 mode=s.mode,
+                                 host=hosts,
+                                 logfile=s.logfile)
+        return srv
 
 
 def get_all_server_info():
@@ -82,10 +79,10 @@ def get_all_server_info():
         return serverlist
 
 
-def update_server(id: int, status: int, logfile: str = None):
+def update_server(srvid: int, status: int, logfile: str = None):
     db = SessionLocal()
     try:
-        s_obj = db.query(Server).filter(Server.id == id).first()
+        s_obj = db.query(Server).filter(Server.id == srvid).first()
         s_obj.updatetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         s_obj.status = status
         if logfile:
@@ -100,39 +97,12 @@ def update_server(id: int, status: int, logfile: str = None):
         db.close()
 
 
-def delete_server(id: int):
-    """
-    删除主机
-    :param db: 数据库连接
-    :param host: 主机名
-    :return: bool
-    """
+def delete_server(ids: List[int]):
     db = SessionLocal()
     try:
-        db.query(ServerHost).filter(ServerHost.server_id == id).delete()
-        db.query(Server).filter(Server.id == id).delete()
-        db.commit()
-        return True
-    except Exception as e:
-        db.rollback()
-        print(e)
-        return False
-    finally:
-        db.close()
-
-
-def chage_server_status(ids: List[int]):
-    """
-    将server状态重置为未安装
-    :param ids: id 列表
-    :return: bool
-    """
-    db = SessionLocal()
-    try:
-        for id in ids:
-            s_obj = db.query(Server).filter(Server.id == id).first()
-            s_obj.updatetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            s_obj.status = 0
+        for srvid in ids:
+            db.query(ServerHost).filter(ServerHost.server_id == srvid).delete()
+            db.query(Server).filter(Server.id == srvid).delete()
         db.commit()
         return True
     except Exception as e:

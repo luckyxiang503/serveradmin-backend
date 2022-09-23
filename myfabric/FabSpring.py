@@ -12,9 +12,7 @@ jdkPkgName = "jdk-8u341-linux-x64.tar.gz"
 jdkVersion = "jdk1.8.0_341"
 
 
-def jdkMain(pkgsdir, d):
-    logfile = d['logfile']
-    logger = SimpleFunc.FileLog(logfile=logfile)
+def jdkMain(pkgsdir, d, logger):
     hosts = d['host']
     for host in hosts:
         # 连接远程机器
@@ -85,21 +83,20 @@ def jdkInstall(pkgsdir, conn, logger):
     logger.info("jdk install success.")
 
 
-def appinit(pkgsdir, d):
+def appinit(pkgsdir, d, logger):
     hosts = d['host']
     pkgpath = os.path.join(pkgsdir, "tools")
     remotepath = "/opt/pkgs/tools"
     tomcatpkg = "apache-tomcat-8.5.51.tar.gz"
     pinpointpkg = "pinpoint-agent-2.3.3.tar.gz"
+    pinpointv = "pinpoint-agent-2.3.3"
     group = "hcapp"
     user = "spring"
     upasswd = SimpleFunc.createpasswd()
 
-    logfile = d['logfile']
-    logger = SimpleFunc.FileLog(logfile=logfile)
     for host in hosts:
         # 连接远程机器
-        logger.info(">>>>>>>>>>>>>>>>> app init <<<<<<<<<<<<<<<<<<".format(host['ip']))
+        logger.info(">>>>>>>>>>>>> [{}] app init <<<<<<<<<<<<".format(host['ip']))
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
             r = conn.run("[ -d /usr/local/{0} ] && [ -f /usr/local/{0}/bin/java ]".format(jdkVersion), warn=True, hide=True)
@@ -142,7 +139,7 @@ def appinit(pkgsdir, d):
             if r.exited != 0:
                 logger.info("tar xf {}".format(pinpointpkg))
                 conn.run("tar -xf {}/{} -C /home/{}".format(remotepath, pinpointpkg, user), hide=True)
-                conn.run("mv /home/{0}/{1} /home/{0}/pinpoint".format(user, pinpointpkg), hide=True)
+                conn.run("mv /home/{0}/{1} /home/{0}/pinpoint".format(user, pinpointv), hide=True)
 
             conn.run("mkdir -p /logs", warn=True, hide=True)
             conn.run("chown -R {0}:{1} /logs /home/{0}".format(user, group), warn=True, hide=True)

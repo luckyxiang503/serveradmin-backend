@@ -3,17 +3,17 @@
     @Author    : xiang
     @CreateTime: 2022/8/8 16:18
 '''
-import contextlib
 import os
 import datetime
 import fabric
 import SimpleFunc
-
-dirpath = os.path.dirname(__file__)
-msgFile = os.path.join(os.path.dirname(dirpath), "ServerMsg.txt")
+from config import settings
 
 
-def base(pkgsdir, d):
+msgFile = settings.serverMsgText
+
+
+def base(pkgsdir, d, logger):
     pkgpath = os.path.join(pkgsdir, "base")
     pypkgpath = os.path.join(pkgsdir, 'pypi')
     remotepath = '/opt/pkgs/base'
@@ -25,14 +25,14 @@ def base(pkgsdir, d):
 
     res = []
 
-    # 日志定义
-    logfile = d['logfile']
-    logger = SimpleFunc.FileLog(logfile=logfile)
     for host in hosts:
+        logger.info("=" * 40)
+        logger.info("[{}] base install......".format(host['ip']))
+        logger.info("=" * 40)
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
             # 拷贝文件到远程主机
-            logger.info(">>>>>>>>>>>>>>>>> copy package to remothost <<<<<<<<<<<<<<<<")
+            logger.info(">>>>> copy package to remothost <<<<<")
             if not os.path.exists(pkgpath):
                 logger.error("local path {} not exist.".format(pkgpath))
                 return 1
@@ -47,7 +47,6 @@ def base(pkgsdir, d):
                     conn.put(localfile, rpath)
 
             # 拷贝pypi文件到远程主机
-            logger.info(">>>>>>>>>>>>>>>>> copy pypkgs to remothost <<<<<<<<<<<<<<<<")
             if not os.path.exists(pypkgpath):
                 logger.error("local path {} not exist.".format(pypkgpath))
                 return 1
@@ -68,13 +67,13 @@ def base(pkgsdir, d):
                 return 1
 
             # 安装工具
-            logger.info(">>>>>>>>>>>>>>> create local repos <<<<<<<<<<<<<<<<<")
+            logger.info(">>>>> create local repos <<<<<")
             rcode = createLocalRepo(pkgsdir, conn, logger)
             if rcode != None:
                 logger.error("create local repos faild!")
                 return 1
 
-            logger.info(">>>>>>>>>>>>>>>>>> install tools <<<<<<<<<<<<<<<<<<<<<<")
+            logger.info(">>>>> install tools <<<<<")
             result = {
                 'host': host['ip'],
                 'succ': [],
@@ -132,14 +131,14 @@ def base(pkgsdir, d):
 
 def createLocalRepo(pkgsdir, conn, logger):
     #判断是否已有本地yum源
-    logger.info(">>>>>>>>>>>>>  check local repos  <<<<<<<<<<<<<<")
+    logger.info("check local repos")
     r = conn.run("yum repolist | grep -E \"^local\ +\"", warn=True, hide=True)
     if r.exited == 0:
         logger.info("yum local repos is installed.")
         return
     # 安装本地yum源
     localrepo = os.path.join(pkgsdir, 'yumrepos')
-    logger.info(">>>>>>>>>>>>  create yum local repos. <<<<<<<<<<<")
+    logger.info(">>>>> create yum local repos <<<<<")
     remoterepo = "/opt/yumrepos"
     # 拷贝文件到远程主机
     logger.info("copy repopkgs to remothost.")
@@ -162,14 +161,15 @@ def createLocalRepo(pkgsdir, conn, logger):
     conn.run("yum makecache", hide=True, warn=True)
     logger.info("yum local repos create success.")
 
+
 def sysbaseline(remotepath, conn, logger):
-    logger.info(">>>>>>>>>>>>>>>>>>> system base line <<<<<<<<<<<<<<<<<<<<")
-    logger.info("selinux...")
+    logger.info(">>>>> system base line <<<<<")
+    logger.info("selinux ......")
     conn.run("setenforce 0", hide=True, warn=True)
     conn.run("sed -i 's/= *enforcing/=permissive/g' /etc/selinux/config", warn=True, hide=True)
     logger.info("selinu finish.")
 
-    logger.info("limit nofile ...")
+    logger.info("limit nofile ......")
     r = conn.run("grep -E \"^*[ ]+(soft|hard)[ ]+nofile[ ]+65535\" /etc/security/limits.conf", warn=True, hide=True)
     if r.exited != 0:
         conn.run("cp -f /etc/security/limits.conf /etc/security/limits.conf_`date +%F-%H%M%S`", warn=True)
@@ -177,7 +177,7 @@ def sysbaseline(remotepath, conn, logger):
         conn.run("echo \"*          hard    nofile     65535\" >> /etc/security/limits.conf", warn=True)
     logger.info("limit nofile finish.")
 
-    logger.info("ssh config...")
+    logger.info("ssh config ......")
     conn.run("cp -f /etc/ssh/sshd_config /etc/ssh/sshd_config_`date +%F-%H%M%S`", warn=True)
     conn.run("cp -f {}/sshd_config /etc/ssh/".format(remotepath), warn=True)
     conn.run("cp -f {}/ssh_banner /etc/".format(remotepath), warn=True)
