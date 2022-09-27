@@ -33,13 +33,17 @@ class fabRedis():
 
         # 判断部署方式 1、单机 2、单机伪集群 3、三节点集群 4、六节点集群
         if mode == "redis-single" and hostnum == 1:
-            self.redisSingle(hosts[0], logger)
+            if self.redisSingle(hosts[0], logger) is not None:
+                return 1
         elif mode == "redis-cluster-one" and hostnum == 1:
-            self.redisClusterOne(hosts[0], logger)
+            if self.redisClusterOne(hosts[0], logger) is not None:
+                return 1
         elif mode == "redis-cluster-three" and hostnum == 3:
-            self.redisClusterThree(hosts, logger)
+            if self.redisClusterThree(hosts, logger) is not None:
+                return 1
         elif mode == "redis-cluster-six" and hostnum == 6:
-            self.redisClusterSix(hosts, logger)
+            if self.redisClusterSix(hosts, logger) is not None:
+                return 1
         else:
             logger.error("redis model and host is not match.")
             return 1
@@ -140,8 +144,8 @@ class fabRedis():
             conn.run("cp -f {}/redis-6379.service /lib/systemd/system/".format(self.remotepath), warn=True, hide=True)
             conn.run("systemctl daemon-reload", hide=True)
             try:
-                conn.run("systemctl start redis-6379.service")
-                conn.run("systemctl enable redis-6379.service")
+                conn.run("systemctl start redis-6379.service", hide=True)
+                conn.run("systemctl enable redis-6379.service", hide=True)
             except:
                 logger.error("redis server start error.")
                 return 1
@@ -208,8 +212,8 @@ class fabRedis():
             conn.run("systemctl daemon-reload", hide=True)
             try:
                 for i in range(7000, 7006):
-                    conn.run("systemctl start redis-{}.service".format(i))
-                    conn.run("systemctl enable redis-{}.service".format(i))
+                    conn.run("systemctl start redis-{}.service".format(i), hide=True)
+                    conn.run("systemctl enable redis-{}.service".format(i), hide=True)
             except:
                 logger.error("redis server start error.")
                 return 1
@@ -292,8 +296,8 @@ class fabRedis():
                 conn.run("systemctl daemon-reload", hide=True)
                 try:
                     for i in range(7000, 7002):
-                        conn.run("systemctl start redis-{}.service".format(i))
-                        conn.run("systemctl enable redis-{}.service".format(i))
+                        conn.run("systemctl start redis-{}.service".format(i), hide=True)
+                        conn.run("systemctl enable redis-{}.service".format(i), hide=True)
                 except:
                     logger.error("redis server start error.")
                     return 1
@@ -375,8 +379,8 @@ class fabRedis():
                 conn.run("sed -i 's/7000/{0}/g' /lib/systemd/system/redis-{0}.service".format(port), warn=True, hide=True)
                 conn.run("systemctl daemon-reload", hide=True)
                 try:
-                    conn.run("systemctl start redis-{}.service".format(port))
-                    conn.run("systemctl enable redis-{}.service".format(port))
+                    conn.run("systemctl start redis-{}.service".format(port), hide=True)
+                    conn.run("systemctl enable redis-{}.service".format(port), hide=True)
                 except:
                     logger.error("redis server start error.")
                     return 1

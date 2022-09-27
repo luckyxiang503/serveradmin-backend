@@ -65,7 +65,6 @@ def fabric_install(srv):
         logger.info("{} install finished.".format(srv.srvname))
         logger.info("=" * 40)
 
-    print("rcode: {}".format(rcode))
     if rcode is None:
         return True
     else:

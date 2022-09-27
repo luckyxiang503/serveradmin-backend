@@ -30,9 +30,11 @@ class fabMysql():
 
         # 判断部署方式
         if mode == "mysql-single" and hostNum == 1:
-            self.mysqlSingle(hosts[0], logger)
+           if self.mysqlSingle(hosts[0], logger) is not None:
+                return 1
         elif mode == "mysql-1M1S" and hostNum == 2:
-            self.mysql1M1S(hosts, logger)
+            if self.mysql1M1S(hosts, logger) is not None:
+                return 1
         else:
             logger.error("mysql host num is not true.")
             return 1
@@ -284,7 +286,7 @@ class fabMysql():
 
 
 def check_mysql(conn):
-    r = conn.run("which mysqld >/dev/null && rpm -ql mysql-community >/dev/null", warn=True, hide=True)
+    r = conn.run("which mysqld >/dev/null && rpm -ql mysql-community-server >/dev/null", warn=True, hide=True)
     if r.exited != 0:
         return "未安装"
     r = conn.run("ps -ef | grep mysql | grep -v grep", warn=True, hide=True)

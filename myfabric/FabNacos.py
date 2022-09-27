@@ -27,9 +27,11 @@ class fabNacos():
         mode = d['mode']
         hostnum = len(hosts)
         if mode == 'nacos-single' and hostnum == 1:
-            self.nacosSingle(hosts[0], logger)
+            if self.nacosSingle(hosts[0], logger) is not None:
+                return 1
         elif mode == 'nacos-cluster' and hostnum >= 3:
-            self.nacosCluster(hosts, logger)
+            if self.nacosCluster(hosts, logger) is not None:
+                return 1
         else:
             print("ERROR: nacos mode or host num not true!")
             return 1

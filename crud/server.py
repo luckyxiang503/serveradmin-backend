@@ -98,11 +98,10 @@ def update_server(srvid: int, status: int, logfile: str = None):
         db.close()
 
 
-def delete_server(ids: List[int]):
+def delete_server(srvid: int):
     db = SessionLocal()
     try:
-        for srvid in ids:
-            db.query(Server).filter(Server.id == srvid).delete()
+        db.query(Server).filter(Server.id == srvid).delete()
         db.commit()
         return True
     except Exception as e:

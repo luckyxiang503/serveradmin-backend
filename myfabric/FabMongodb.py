@@ -33,9 +33,11 @@ class fabMongodb:
         hostnum = len(hosts)
 
         if mode == "mongodb-single" and hostnum == 1:
-            self.mongodbSingle(hosts[0], logger)
+            if self.mongodbSingle(hosts[0], logger) is not None:
+                return 1
         elif mode == "mongodb-sharding" and hostnum == 3:
-            self.mongodbSharding(hosts, logger)
+            if self.mongodbSharding(hosts, logger) is not None:
+                return 1
         else:
             logger.error("host num or mode is not true!")
             return 1

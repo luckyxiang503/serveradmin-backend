@@ -28,9 +28,11 @@ class fabZookeeper():
         hostnum = len(hosts)
 
         if mode == 'zookeeper-single' and hostnum == 1:
-            self.zookeeperSingle(hosts[0], logger)
+            if self.zookeeperSingle(hosts[0], logger) is not None:
+                return 1
         elif mode == 'zookeeper-cluster' and hostnum >= 3:
-            self.zookeeperCluster(hosts, logger)
+            if self.zookeeperCluster(hosts, logger) is not None:
+                return 1
         else:
             print("ERROR: rocketMQ mode is not true.")
             return 1

@@ -13,14 +13,14 @@ from crud.host import get_host_by_ip
 server = APIRouter(tags=["服务安装相关"])
 
 
-@server.post("/srvsaveinfo", summary='服务信息保存')
+@server.post("/srvsaveinfo", summary='服务信息保存', response_model=Response200)
 async def save_server_to_db(server: List[Server]):
     if save_server_info(server):
         return Response200(msg="保存信息成功")
     raise HTTPException(status_code=400, detail="保存服务信息失败")
 
 
-@server.post("/server", summary='安装接口')
+@server.post("/server", summary='安装接口', response_model=Response200)
 async def server_install(srvid: int, bg_tasks: BackgroundTasks):
     srv = get_serverinfo_by_id(srvid)
     if srv is None or len(srv.host) == 0:
@@ -34,19 +34,19 @@ async def get_server_install_record():
     return get_all_server_info()
 
 
-@server.delete("/server", summary='删除记录')
+@server.delete("/server", summary='删除记录', response_model=Response200)
 async def delete_server_record(ids: List[int]):
     for id in ids:
         srv = get_serverinfo_by_id(id)
         if srv is None:
             continue
-        if not delete_server(ids):
+        if not delete_server(id):
             raise HTTPException(status_code=400, detail="srvname: {}, id: {} 删除失败".format(srv.srvname, srv.id))
         delete_logfile(srv.logfile)
     return Response200(msg="服务记录删除成功")
 
 
-@server.post("/servercheck", summary="主机服务检查")
+@server.post("/servercheck", summary="主机服务检查", response_model=ServerCheck)
 async def server_check(srvcheckinfo: ServerCheck):
     host: Host = get_host_by_ip(srvcheckinfo.host)
     if host is None:

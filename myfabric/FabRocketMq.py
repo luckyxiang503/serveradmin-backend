@@ -36,9 +36,11 @@ class fabRocketmq:
         hostnum = len(hosts)
 
         if mode == 'rocketmq-single' and hostnum == 1:
-            self.rocketmqSingle(hosts[0], logger)
+            if self.rocketmqSingle(hosts[0], logger) is not None:
+                return 1
         elif mode == 'rocketmq-nM' and hostnum > 1:
-            self.rocketmqnM(hosts, logger)
+            if self.rocketmqnM(hosts, logger) is not None:
+                return 1
         else:
             print("ERROR: rocketMQ mode is not true.")
             return 1
