@@ -6,36 +6,33 @@
 import datetime
 import os
 import time
-
 import fabric
 
 import FabSpring
 import SimpleFunc
-from config import settings
+from config import settings, rocketmqConf
 
 
-class fabRocketmq():
-    def __init__(self, pkgsdir, d, logger):
-        self.pkgsdir = pkgsdir
-        self.pkgpath = os.path.join(pkgsdir, d['srvname'])
-        mode = d['mode']
-        hosts = d['host']
+class fabRocketmq:
+    def __init__(self):
         self.remotepath = "/opt/pkgs/rocketmq"
-        self.rocketmqPath = "/opt/rocketMQ"
-        self.datapath = "/opt/rocketMQ/data"
-        self.logpath = "/opt/rocketMQ/logs"
-        self.zippkgname = "rocketmq-all-4.9.4-bin-release.zip"
-        self.consolepkgname = "rocketmq-console-ng-1.0.1.jar"
-        self.consolepath = "/opt/rocketMQ/console"
-        self.xms = "1g"
-        self.xmx = "1g"
-        self.xmn = "512m"
-        self.JAVAHOME = "/usr/local/jdk1.8.0_341"
+        self.rocketmqPath = rocketmqConf.rocketmq_install_path
+        self.datapath = rocketmqConf.data_path
+        self.logpath = rocketmqConf.log_path
+        self.zippkgname = rocketmqConf.pkg_name
+        self.consolepkgname = rocketmqConf.console_pkg_name
+        self.consolepath = rocketmqConf.rocketmq_install_path
+        self.xms = rocketmqConf.xms
+        self.xmx = rocketmqConf.xmx
+        self.xmn = rocketmqConf.xmn
+        self.JAVAHOME = rocketmqConf.JAVAHOME
         self.msgFile = settings.serverMsgText
 
-        self.rocketmqMain(mode, hosts, logger)
-
-    def rocketmqMain(self, mode, hosts, logger):
+    def rocketmqMain(self, d, logger):
+        self.pkgsdir = settings.pkgsdir
+        self.pkgpath = os.path.join(self.pkgsdir, d['srvname'])
+        mode = d['mode']
+        hosts = d['host']
         hostnum = len(hosts)
 
         if mode == 'rocketmq-single' and hostnum == 1:
@@ -48,7 +45,7 @@ class fabRocketmq():
 
     def rocketmqInstall(self, conn, logger):
         # 判断是否已经安装
-        logger.info("check rocketMQ isn't installed.")
+        logger.info("Check whether RocketMQ is installed...")
         r = conn.run("[ -d {0} ] && [ -f {0}/bin/runserver.sh ]".format(self.rocketmqPath), warn=True, hide=True)
         if r.exited == 0:
             logger.warn("rocketMQ is installed, please check it.")
@@ -58,8 +55,8 @@ class fabRocketmq():
         logger.info("check JAVA_HOME...")
         r = conn.run("[ -d {0} ] && [ -f {0}/bin/java ]".format(self.JAVAHOME), hide=True, warn=True)
         if r.exited != 0:
-            logger.error("not JAVA_HOME,start install jdk...")
-            rcode = FabSpring.jdkInstall(self.pkgsdir, conn, logger)
+            logger.error("No JAVA_HOME,start install jdk...")
+            rcode = FabSpring.jdkInstall(conn, logger)
             if rcode != None:
                 logger.info("jdk install faild!")
                 return 1
@@ -119,23 +116,16 @@ class fabRocketmq():
         # 修改日志目录
         conn.run("sed -i 's#{}/logs/rocketmqlogs#{}#g' {}/conf/logback_*.xml".format("\${user.home}", self.logpath,self.rocketmqPath), warn=True)
 
-    def checkRocketmq(self, conn, logger, port=(30911, 9876, 8080)):
-        logger.info("check rocketMQ server...")
-        try:
-            conn.run("ps -ef | grep rocketmq | grep -v grep")
-            for p in port:
-                conn.run("ss -tunlp | grep {}".format(p))
-        except:
-            logger.error("rocketMQ check fiald!")
-
     def rocketmqSingle(self, host, logger):
-        logger.info(">>>>>>>>>>>>>>>>>>>> [{}] rocketmq start install <<<<<<<<<<<<<<<<<<<".format(host['ip']))
+        logger.info("=" * 40)
+        logger.info("[{}] rocketMQ install start......".format(host['ip']))
+        logger.info("=" * 40)
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
             rcode = self.rocketmqInstall(conn, logger)
             if rcode == 0:
                 logger.info("rocketmq install stop.")
-                return
+                return 1
             elif rcode == 1:
                 logger.error("rocketmq install faild !")
                 return 1
@@ -163,32 +153,27 @@ class fabRocketmq():
             logger.info("rocketMQ server starting...")
             conn.run("systemctl daemon-reload", hide=True, warn=True)
             try:
-                conn.run("systemctl start rocketmq-namesrv")
-                conn.run("systemctl enable rocketmq-namesrv")
+                conn.run("systemctl start rocketmq-namesrv", hide=True)
+                conn.run("systemctl enable rocketmq-namesrv", hide=True)
                 time.sleep(5)
-                conn.run("systemctl start rocketmq-broker")
-                conn.run("systemctl enable rocketmq-broker")
+                conn.run("systemctl start rocketmq-broker", hide=True)
+                conn.run("systemctl enable rocketmq-broker", hide=True)
                 time.sleep(5)
-                conn.run("systemctl start rocketmq-console")
-                conn.run("systemctl enable rocketmq-console")
+                conn.run("systemctl start rocketmq-console", hide=True)
+                conn.run("systemctl enable rocketmq-console", hide=True)
             except:
                 logger.error("rocketMQ server start faild!")
                 return 1
 
-            # self.checkRocketmq(conn, logger)
         # 将相关信息存入文件中
         logger.info("redis msg write to ServerMsg.txt")
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  RoceketMQ server  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  RoceketMQ single  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
             f.write("time: {}\n".format(dtime))
-            f.write("Mode: single\n")
             f.write("rocketmq namesrv: {}:9876\n".format(host['ip']))
             f.write("rocketmq broker: {}:10911\n".format(host['ip']))
-            f.write("System user: rocketmq, password: {}\n".format(upasswd))
-            f.write("configpath: {}/conf\n".format(self.rocketmqPath))
-            f.write("logpath: {}\n".format(self.logpath))
-            f.write("datapath: {}\n\n".format(self.datapath))
+            f.write("系统用户: rocketmq, 密码: {}\n".format(upasswd))
 
     def rocketmqnM(self, hosts, logger):
         upasswd = SimpleFunc.createpasswd()
@@ -204,13 +189,16 @@ class fabRocketmq():
             m += 1
 
         for host in hosts:
-            logger.info(">>>>>>>>>>>>>>>>>>>> [{}] rocketmq start install <<<<<<<<<<<<<<<<<<<".format(host['ip']))
+            s = host['ip'].split('.')[-1]
+            logger.info("=" * 40)
+            logger.info("[{}] rocketMQ install start......".format(host['ip']))
+            logger.info("=" * 40)
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 rcode = self.rocketmqInstall(conn, logger)
                 if rcode == 0:
                     logger.info("rocketmq install stop.")
-                    return
+                    return 1
                 elif rcode == 1:
                     logger.error("rocketmq install faild !")
                     return 1
@@ -242,30 +230,35 @@ class fabRocketmq():
                 logger.info("rocketMQ server starting...")
                 conn.run("systemctl daemon-reload", hide=True, warn=True)
                 try:
-                    conn.run("systemctl start rocketmq-namesrv")
-                    conn.run("systemctl enable rocketmq-namesrv")
+                    conn.run("systemctl start rocketmq-namesrv", hide=True)
+                    conn.run("systemctl enable rocketmq-namesrv", hide=True)
                     time.sleep(5)
-                    conn.run("systemctl start rocketmq-broker")
-                    conn.run("systemctl enable rocketmq-broker")
+                    conn.run("systemctl start rocketmq-broker", hide=True)
+                    conn.run("systemctl enable rocketmq-broker", hide=True)
                     time.sleep(5)
-                    conn.run("systemctl start rocketmq-console")
-                    conn.run("systemctl enable rocketmq-console")
+                    conn.run("systemctl start rocketmq-console", hide=True)
+                    conn.run("systemctl enable rocketmq-console", hide=True)
                 except:
                     logger.error("rocketMQ server start faild!")
                     return 1
                 time.sleep(5)
 
-                # self.checkRocketmq(conn, logger)
-                # 将相关信息存入文件中
-
+        # 将相关信息存入文件中
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  RoceketMQ server  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  RoceketMQ rocketmq-nM  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
             f.write("time: {}\n".format(dtime))
-            f.write("Mode: rocketmq-nM\n")
             f.write("rocketmq namesrv: {}\n".format(namesrvaddr))
             f.write("rocketmq broker: {}\n".format(brokeraddr))
-            f.write("System user: rocketmq, password: {}\n".format(upasswd))
-            f.write("configpath: {}/conf\n".format(self.rocketmqPath))
-            f.write("logpath: {}\n".format(self.logpath))
-            f.write("datapath: {}\n\n".format(self.datapath))
+            f.write("系统用户: rocketmq, 密码: {}\n".format(upasswd))
+
+
+def check_rocketmq(conn):
+    r = conn.run("[ -d {0} ] && [ -f {0}/bin/runserver.sh ]".format(rocketmqConf.rocketmq_install_path), warn=True, hide=True)
+    if r.exited != 0:
+        return "未安装"
+    r = conn.run("ps -ef | grep rocketmq | grep -v grep", warn=True, hide=True)
+    if r.exited != 0:
+        return "已安装，未启动服务"
+    else:
+        return "服务已启动"

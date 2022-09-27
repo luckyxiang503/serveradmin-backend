@@ -6,45 +6,44 @@
 import os
 import datetime
 import fabric
-import SimpleFunc
 
-from config import settings
+from config import settings, nginxConf
 
 
 class fabTengine():
-    def __init__(self, pkgsdir, d, logger):
-        self.pkgsdir = pkgsdir
-        self.pkgpath = os.path.join(pkgsdir, d['srvname'])
-        hosts = d['host']
+    def __init__(self):
         self.remotepath = "/opt/pkgs/nginx"
-        self.nginxVersion = "tengine-2.3.3"
-        self.luajitVersion = "LuaJIT-2.0.4"
-        self.nginxPath = "/usr/local/nginx"
+        self.nginxVersion = nginxConf.nginx_version
+        self.luajitVersion = nginxConf.luajit_version
+        self.nginxPath = nginxConf.nginx_install_path
         self.msgFile = settings.serverMsgText
 
-        self.tengineMain(hosts, logger)
-
-    def tengineMain(self, hosts, logger):
+    def tengineMain(self, d, logger):
+        self.pkgsdir = settings.pkgsdir
+        self.pkgpath = os.path.join(self.pkgsdir, d['srvname'])
         l = []
+        hosts = d['host']
 
         for host in hosts:
             l.append(host['ip'])
 
-            logger.info(">>>>>>>>>>>>>>>>>>>> [{}] nginx start install <<<<<<<<<<<<<<<<<<<".format(host['ip']))
+            logger.info("=" * 40)
+            logger.info("[{}] nginx install start......".format(host['ip']))
+            logger.info("=" * 40)
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 #安装nginx
                 rcode = self.tengineInstall(conn, logger)
                 if rcode == 0:
                     logger.info("nginx install stop.")
-                    return
+                    return 1
                 elif rcode == 1:
                     logger.error("nginx install faild !")
                     return 1
                 logger.info("nginx install success")
 
                 # ngnix配置
-                logger.info("copy nginx.conf")
+                logger.info("copy nginx.conf...")
                 conn.run("[ -f /etc/nginx/nginx.conf ] && mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf_bak_`date +%F_%H%M%S`", warn=True)
                 conn.run("cp -f {}/nginx.conf /etc/nginx/nginx.conf".format(self.remotepath), hide=True)
                 logger.info("create user nginx...")
@@ -64,21 +63,16 @@ class fabTengine():
                     return 1
                 logger.info("nginx start success.")
 
-                # nginx服务检查
-                self.nginxCheck(conn, logger)
-
         # 将服务信息写入文件
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  Nginx server  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
             f.write("time: {}\n".format(dtime))
             f.write("Host: {}\n".format(",".join(l)))
-            f.write("Config file: /etc/nginx/nginx.conf\n")
-            f.write("Logfile: /var/log/nginx\n\n")
 
     def tengineInstall(self, conn, logger):
         # 判断nginx是否已经安装
-        logger.info(">>>>>>>>>>>>>> check nginx server isn't installed <<<<<<<<<<<<<")
+        logger.info("Check whether nginx is installed...")
         r = conn.run("[ -d {0} ] && [ -f {0}/sbin/nginx ]".format(self.nginxPath), warn=True, hide=True)
         if r.exited == 0:
             logger.info("nginx server is installed, please check it.")
@@ -104,7 +98,7 @@ class fabTengine():
         # 安装本地yum源
         rcode = self.createyumrepos(conn, logger)
         if rcode != None:
-            logger.error("install local yumrepos faild!")
+            logger.error("create local yumrepos faild!")
             return 1
 
         # 安装依赖包
@@ -122,7 +116,7 @@ class fabTengine():
         logger.info("install luajit...")
         try:
             with conn.cd("{}/{}".format(self.remotepath, self.luajitVersion)):
-                logger.info("make install runing...")
+                logger.info("make install runing, , Please wait 3-5 minutes...")
                 conn.run("make install PREFIX=/usr/local/luajit", hide=True)
         except:
             logger.error("install luajit faild!")
@@ -141,9 +135,9 @@ class fabTengine():
         try:
             with conn.cd("{}/{}".format(self.remotepath, self.nginxVersion)):
                 with conn.prefix("source /etc/profile"):
-                    logger.info("configure runing...")
+                    logger.info("configure runing, Please wait 5-10 minutes...")
                     conn.run("./configure --prefix=/usr/local/nginx/ --conf-path=/etc/nginx/nginx.conf --with-pcre --with-debug --with-http_stub_status_module --with-http_ssl_module --with-ld-opt=-Wl,-rpath,/usr/local/luajit/lib --add-module=modules/ngx_http_lua_module --add-module=modules/ngx_http_upstream_check_module --add-module=modules/ngx_http_reqstat_module", hide=True)
-                logger.info("make runing...")
+                logger.info("make runing, Please wait 3-5 minutes...")
                 conn.run("make -j 4 && make install", hide=True)
         except:
             logger.error("install nginx faild!")
@@ -152,13 +146,13 @@ class fabTengine():
 
     def createyumrepos(self, conn, logger):
         # 安装本地yum源
-        logger.info(">>>>>>>>>>>>>  check local repos  <<<<<<<<<<<<<<")
+        logger.info("check local repos, Please wait 5-10 minutes...")
         r = conn.run("yum repolist | grep -E \"^local\ +\"", warn=True, hide=True)
         if r.exited == 0:
             logger.info("yum local repos is installed.")
             return
         localrepo = "{}/yumrepos".format(self.pkgsdir)
-        logger.info(">>>>>>>>>>>>  create yum local repos. <<<<<<<<<<<")
+        logger.info("create yum local repos, Please wait 3-5 minutes...")
         remoterepo = "/opt/yumrepos"
         # 拷贝文件到远程主机
         logger.info("copy repopkgs to remothost.")
@@ -174,18 +168,19 @@ class fabTengine():
                 localfile = os.path.join(root, file)
                 logger.info("put file: {} to {}".format(localfile, repopath))
                 conn.put(localfile, repopath)
-        logger.info("create local.repo")
+        logger.info("create local.repo...")
         repofile = '[local]\nname=local repository\nbaseurl=file://{}\ngpgcheck=0\nenabled=1'.format(remoterepo)
         conn.run("echo '{}' > /etc/yum.repos.d/local.repo".format(repofile))
         conn.run("yum makecache", hide=True, warn=True)
         logger.info("yum local repos create success.")
 
-    def nginxCheck(self, conn, logger):
-        logger.info(">>>>>>>>>>>>>>> check nginx server <<<<<<<<<<<<<<")
-        try:
-            logger.info("check nginx server process.")
-            conn.run("ps -ef | grep nginx | grep -v grep", hide=True)
-            logger.info("nginx server listen port.")
-            conn.run("ss -tunlp | grep nginx")
-        except:
-            logger.error("nginx server check error!")
+
+def check_nginx(conn):
+    r = conn.run("[ -d {0} ] && [ -f {0}/sbin/nginx ]".format(nginxConf.nginx_install_path), warn=True, hide=True)
+    if r.exited != 0:
+        return "未安装"
+    r = conn.run("ps -ef | grep nginx | grep -v grep", warn=True, hide=True)
+    if r.exited != 0:
+        return "已安装，未启动服务"
+    else:
+        return "服务已启动"

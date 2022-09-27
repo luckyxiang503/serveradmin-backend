@@ -22,6 +22,7 @@ class Host(Base):
     port = Column(Integer(), comment="端口")
     user = Column(String(20), comment="用户")
     password = Column(String(100), comment="密码")
+    sys_version = Column(String(10), comment="系统版本")
 
 
 class Server(Base):
@@ -42,8 +43,8 @@ class ServerHost(Base):
     __tablename__ = "serverhost"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    host_id = Column(Integer, ForeignKey('hosts.id'))
-    server_id = Column(Integer, ForeignKey('server.id'))
+    host_id = Column(Integer, ForeignKey('hosts.id', ondelete='CASCADE'))
+    server_id = Column(Integer, ForeignKey('server.id', ondelete='CASCADE'))
     role = Column(String(20), comment="主机角色")
 
     hosts = relationship('Host', uselist=False, backref="serverhost")

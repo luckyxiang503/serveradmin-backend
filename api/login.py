@@ -9,7 +9,7 @@ from schemas.user import UserBase
 login = APIRouter(tags=["认证相关"])
 
 
-@login.post("/login", summary='登录')
+@login.post("/login", summary='登录', response_model=ResponseToken)
 async def user_login(form_data: OAuth2PasswordRequestForm = Depends()):
     db_user = get_user_by_name(username=form_data.username)
     if db_user is None:
@@ -19,11 +19,6 @@ async def user_login(form_data: OAuth2PasswordRequestForm = Depends()):
         return ResponseToken(token=f"bearer {token}")
     else:
         raise HTTPException(status_code=400, detail="密码错误")
-
-
-@login.put("/logout", summary="注销")
-async def user_logout():
-    pass
 
 
 @login.get("/userinfo", summary='登录用户信息', response_model=UserBase)

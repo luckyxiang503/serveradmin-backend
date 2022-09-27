@@ -8,28 +8,27 @@ import datetime
 import fabric
 import SimpleFunc
 
-from config import settings
+from config import settings, redisConf
 
 
 class fabRedis():
-    def __init__(self, pkgsdir, d, logger):
+    def __init__(self):
+        self.remotepath = "/opt/pkgs/redis"
+        self.datapath = redisConf.data_path
+        self.logpath = redisConf.log_path
+        self.confpath = redisConf.conf_path
+        self.cludatapath = redisConf.clu_data_path
+        self.clulogpath = redisConf.clu_log_path
+        self.cluconfpath = redisConf.clu_conf_path
+        self.redis_version = redisConf.redis_version
+        self.redis_dir = redisConf.redis_install_path
+        self.msgFile = settings.serverMsgText
+
+    def redisMain(self, d, logger):
+        pkgsdir = settings.pkgsdir
         self.pkgpath = os.path.join(pkgsdir, d['srvname'])
         mode = d['mode']
         hosts = d['host']
-        self.remotepath = "/opt/pkgs/redis"
-        self.datapath = "/opt/redis/data"
-        self.logpath = "/var/log/redis"
-        self.confpath = "/etc/redis"
-        self.cludatapath = "/opt/redis-cluster"
-        self.clulogpath = "/var/log/redis-cluster"
-        self.cluconfpath = "/etc/redis-cluster"
-        self.redis_version = "redis-6.2.7"
-        self.redis_dir = "/usr/local/{}".format(self.redis_version)
-        self.msgFile = settings.serverMsgText
-
-        self.redisMain(mode, hosts, logger)
-
-    def redisMain(self, mode, hosts, logger):
         hostnum = len(hosts)
 
         # 判断部署方式 1、单机 2、单机伪集群 3、三节点集群 4、六节点集群
@@ -42,7 +41,7 @@ class fabRedis():
         elif mode == "redis-cluster-six" and hostnum == 6:
             self.redisClusterSix(hosts, logger)
         else:
-            print("ERROR: redis model and host is not match.")
+            logger.error("redis model and host is not match.")
             return 1
 
     def redisInstall(self, conn, logger):
@@ -52,7 +51,7 @@ class fabRedis():
         :return:
         '''
         # 检查是否已经安装
-        logger.info(">>>>>>>>>>>>>> check redis server isn't installed <<<<<<<<<<<<<")
+        logger.info("Check whether redis is installed...")
         r = conn.run("[ -d {0} ] && [ -f {0}/bin/redis-server ] && [ -f {0}/bin/redis-cli ]".format(self.redis_dir),
                      warn=True, hide=True)
         if r.exited == 0:
@@ -83,9 +82,9 @@ class fabRedis():
         logger.info("install redis......")
         try:
             with conn.cd("{}/{}".format(self.remotepath, self.redis_version)):
-                logger.info("make runing......")
+                logger.info("make runing, Please wait 5-10 minutes...")
                 conn.run("make -j 4", hide=True)
-                logger.info("make install runing......")
+                logger.info("make install runing, Please wait 3-5 minutes...")
                 conn.run("make install PREFIX={}".format(self.redis_dir), hide=True)
         except:
             logger.error("{} make error.".format(self.redis_version))
@@ -98,23 +97,6 @@ class fabRedis():
             logger.error("redis bin file not exist.")
             return 1
         logger.info("{} make and make install success.".format(self.redis_version))
-
-    def checkRedis(self, conn, logger, port=(6379,)):
-        '''
-        :param conn: fabric连接实例
-        :param logger: 日志实例
-        :param port: 端口列表
-        :return:
-        '''
-        logger.info(">>>>>>>>>>>>>>> check redis server <<<<<<<<<<<<<<")
-        try:
-            logger.info("redis server process.")
-            conn.run("ps -ef | grep redis | grep -v grep")
-            logger.info("redis server listen port.")
-            for p in port:
-                conn.run("ss -tunlp | grep redis | grep {}".format(p))
-        except Exception as e:
-            logger.error(e)
 
     def redisSingle(self, host, logger):
         # 用户密码
@@ -132,7 +114,7 @@ class fabRedis():
             rcode = self.redisInstall(conn, logger)
             if rcode == 0:
                 logger.info("redis install stop.")
-                return
+                return 1
             elif rcode == 1:
                 logger.error("redis install faild !")
                 return 1
@@ -165,25 +147,17 @@ class fabRedis():
                 return 1
             logger.info("redis server start success.")
 
-            # 检查服务
-            # self.checkRedis(conn, logger)
-
         # 将服务信息写入文件
         logger.info("redis msg write to ServerMsg.txt")
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  Redis server  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  Redis single  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
             f.write("time: {}\n".format(dtime))
-            f.write("Model: single\n")
             f.write("Listen: {}:6379\n".format(host['ip']))
-            f.write("system user: redis, password: {}\n".format(redispwd))
-            f.write("Redis server password: {}\n".format(spasswd))
-            f.write("configpath: {}\n".format(self.confpath))
-            f.write("logpath: {}\n".format(self.logpath))
-            f.write("datapath: {}\n\n".format(self.datapath))
+            f.write("系统用户: redis, 密码: {}\n".format(redispwd))
+            f.write("Redis 服务密码: {}\n".format(spasswd))
 
     def redisClusterOne(self, host, logger):
-        remotepath = self.remotepath
         redispwd = SimpleFunc.createpasswd()
         spasswd = SimpleFunc.createpasswd()
 
@@ -197,7 +171,7 @@ class fabRedis():
             rcode = self.redisInstall(conn, logger)
             if rcode == 0:
                 logger.info("redis install stop.")
-                return
+                return 1
             elif rcode == 1:
                 logger.error("redis install faild !")
                 return 1
@@ -220,7 +194,7 @@ class fabRedis():
                 conn.run("mkdir -p {}".format(cpath), warn=True, hide=True)
                 logger.info("copy redis.conf to {}/redis.conf".format(cpath))
                 conn.run("[ -f {0}/redis.conf ] && mv -f {0}/redis.conf {0}/redis.conf_bak_`date +%F`".format(cpath), warn=True, hide=True)
-                conn.run("cp {}/redis_cluster.conf {}/redis.conf".format(remotepath, cpath))
+                conn.run("cp {}/redis_cluster.conf {}/redis.conf".format(self.remotepath, cpath))
                 conn.run("sed -i 's/^masterauth.*/masterauth {}/' {}/redis.conf".format(spasswd, cpath), warn=True, hide=True)
                 conn.run("sed -i 's/^requirepass.*/requirepass {}/' {}/redis.conf".format(spasswd, cpath), warn=True, hide=True)
                 conn.run("sed -i 's/7000/{}/g' {}/redis.conf".format(i, cpath), warn=True, hide=True)
@@ -229,7 +203,7 @@ class fabRedis():
             # 服务添加与启动
             logger.info(">>>>>>>>>>>>>>> starting redis server <<<<<<<<<<<<<<")
             for i in range(7000, 7006):
-                conn.run("cp -f {}/redis-cluster.service /lib/systemd/system/redis-{}.service".format(remotepath, i), warn=True, hide=True)
+                conn.run("cp -f {}/redis-cluster.service /lib/systemd/system/redis-{}.service".format(self.remotepath, i), warn=True, hide=True)
                 conn.run("sed -i 's/7000/{0}/g' /lib/systemd/system/redis-{0}.service".format(i), warn=True, hide=True)
             conn.run("systemctl daemon-reload", hide=True)
             try:
@@ -250,22 +224,16 @@ class fabRedis():
                 logger.error("redis cluster init error.")
                 return 1
 
-            # 检查服务
-            # self.checkRedis(conn, logger, port=(7000, 7001, 7002, 7003, 7004, 7005))
-
         # 将相关信息存入文件中
         logger.info("redis msg write to ServerMsg.txt")
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  Redis server <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  Redis cluster-one <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
             f.write("time: {}\n".format(dtime))
             f.write("Mode: cluster-one\n")
             f.write("Listen: {}:[7000-7005]\n".format(host['ip']))
-            f.write("system user: redis, password: {}\n".format(redispwd))
-            f.write("Redis server password: {}\n".format(spasswd))
-            f.write("configpath: {}/[7000-7005]\n".format(self.cluconfpath))
-            f.write("logpath: {}/[7000-7005]\n".format(self.clulogpath))
-            f.write("datapath: {}/[7000-7005]\n\n".format(self.cludatapath))
+            f.write("系统用户: redis, 密码: {}\n".format(redispwd))
+            f.write("Redis 服务密码: {}\n".format(spasswd))
 
     def redisClusterThree(self, hosts, logger):
         spasswd = SimpleFunc.createpasswd(length=10)
@@ -282,7 +250,7 @@ class fabRedis():
                 rcode = self.redisInstall(conn, logger)
                 if rcode == 0:
                     logger.info("redis install stop.")
-                    return
+                    return 1
                 elif rcode == 1:
                     logger.error("redis install faild !")
                     return 1
@@ -331,9 +299,6 @@ class fabRedis():
                     return 1
                 logger.info("redis server start success.")
 
-                # 检查服务
-                # self.checkRedis(conn, logger, port=(7000, 7001))
-
         # 集群初始化
         conn = fabric.Connection(host=hosts[0]['ip'], port=hosts[0]['port'], user=hosts[0]['user'],
                                  connect_kwargs={"password": hosts[0]['password']}, connect_timeout=10)
@@ -350,18 +315,14 @@ class fabRedis():
         # 将相关信息存入文件中
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  Redis server  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  Redis cluster-three  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
             f.write("time: {}\n".format(dtime))
             f.write("Mode: cluster-three\n")
             f.write("Listen: {0}:7000 {0}:7001 {1}:7000 {1}:7001 {2}:7000 {2}:7001\n".format(hosts[0]['ip'], hosts[1]['ip'], hosts[2]['ip']))
-            f.write("system user: redis, password: {}\n".format(redispwd))
-            f.write("Redis server password: {}\n".format(spasswd))
-            f.write("configpath: {}/[7000-7001]\n".format(self.cluconfpath))
-            f.write("logpath: {}/[7000-7001]\n".format(self.clulogpath))
-            f.write("datapath: {}/[7000-7001]\n\n".format(self.cludatapath))
+            f.write("系统用户: redis, 密码: {}\n".format(redispwd))
+            f.write("Redis 服务密码: {}\n".format(spasswd))
 
     def redisClusterSix(self, hosts, logger):
-        remotepath = self.remotepath
         spasswd = SimpleFunc.createpasswd(length=10)
         redispwd = SimpleFunc.createpasswd(length=10)
 
@@ -401,7 +362,7 @@ class fabRedis():
                 conn.run(
                     "[ -f {0}/redis.conf ] && mv -f {0}/redis.conf {0}/redis.conf_bak_`date +%F`".format(cpath),
                     warn=True, hide=True)
-                conn.run("cp {}/redis_cluster.conf {}/redis.conf".format(remotepath, cpath))
+                conn.run("cp {}/redis_cluster.conf {}/redis.conf".format(self.remotepath, cpath))
                 conn.run("sed -i 's/^masterauth.*/masterauth {}/' {}/redis.conf".format(spasswd, cpath), warn=True, hide=True)
                 conn.run("sed -i 's/^requirepass.*/requirepass {}/' {}/redis.conf".format(spasswd, cpath), warn=True, hide=True)
                 conn.run("sed -i 's/7000/{}/g' {}/redis.conf".format(port, cpath), warn=True, hide=True)
@@ -409,7 +370,7 @@ class fabRedis():
 
                 # 服务添加与启动
                 logger.info(">>>>>>>>>>>>>>> starting redis server <<<<<<<<<<<<<<")
-                conn.run("cp -f {}/redis-cluster.service /lib/systemd/system/redis-{}.service".format(remotepath, port),
+                conn.run("cp -f {}/redis-cluster.service /lib/systemd/system/redis-{}.service".format(self.remotepath, port),
                          warn=True, hide=True)
                 conn.run("sed -i 's/7000/{0}/g' /lib/systemd/system/redis-{0}.service".format(port), warn=True, hide=True)
                 conn.run("systemctl daemon-reload", hide=True)
@@ -420,9 +381,6 @@ class fabRedis():
                     logger.error("redis server start error.")
                     return 1
                 logger.info("redis server start success.")
-
-                # 检查服务
-                # self.checkRedis(conn, logger, port=(7000,))
 
         # 集群初始化
         conn = fabric.Connection(host=hosts[0]['ip'], port=hosts[0]['port'], user=hosts[0]['user'],
@@ -440,12 +398,18 @@ class fabRedis():
         # 将相关信息存入文件中
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  Redis server  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  Redis cluster-six  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
             f.write("time: {}\n".format(dtime))
-            f.write("Mode: cluster-six\n")
             f.write("Listen: {}:7000 {}:7000 {}:7000 {}:7000 {}:7000 {}:7000\n".format(hosts[0]['ip'], hosts[1]['ip'], hosts[2]['ip'], hosts[3]['ip'], hosts[4]['ip'], hosts[5]['ip']))
-            f.write("system user: redis, password: {}\n".format(redispwd))
-            f.write("Redis server password: {}\n".format(spasswd))
-            f.write("configpath: {}/7000\n".format(self.cluconfpath))
-            f.write("logpath: {}/7000\n".format(self.clulogpath))
-            f.write("datapath: {}/7000\n\n".format(self.cludatapath))
+            f.write("系统用户: redis, 密码: {}\n".format(redispwd))
+            f.write("Redis 服务密码: {}\n".format(spasswd))
+
+def check_redis(conn):
+    r = conn.run("[ -d {0} ] && [ -f {0}/bin/redis-server ] && [ -f {0}/bin/redis-cli ]".format(redisConf.redis_install_path), warn=True, hide=True)
+    if r.exited != 0:
+        return "未安装"
+    r = conn.run("ps -ef | grep redis | grep -v grep", warn=True, hide=True)
+    if r.exited != 0:
+        return "已安装，未启动服务"
+    else:
+        return "服务已启动"

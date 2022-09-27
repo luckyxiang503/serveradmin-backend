@@ -5,28 +5,26 @@
 '''
 import os
 import datetime
-import time
 
 import fabric
 import SimpleFunc, FabSpring
-from config import settings
+from config import settings, nacosConf
 
 
 class fabNacos():
-    def __init__(self, pkgsdir, d, logger):
-        self.pkgsdir = pkgsdir
-        hosts = d['host']
-        mode = d['mode']
-        self.pkgpath = os.path.join(pkgsdir, d['srvname'])
+    def __init__(self):
+
         self.remotepath = "/opt/pkgs/nacos"
-        self.nacospath = "/opt/nacos"
-        self.nacospkgname = "nacos-server-2.1.1.tar.gz"
-        self.JAVAHOME = "/usr/local/jdk1.8.0_341"
+        self.nacospath = nacosConf.nacos_install_path
+        self.nacospkgname = nacosConf.nacos_pkg_name
+        self.JAVAHOME = nacosConf.JAVAHOME
         self.msgFile = settings.serverMsgText
 
-        self.nacosMain(mode, hosts, logger)
-
-    def nacosMain(self, mode, hosts, logger):
+    def nacosMain(self, d, logger):
+        self.pkgsdir = settings.pkgsdir
+        self.pkgpath = os.path.join(self.pkgsdir, d['srvname'])
+        hosts = d['host']
+        mode = d['mode']
         hostnum = len(hosts)
         if mode == 'nacos-single' and hostnum == 1:
             self.nacosSingle(hosts[0], logger)
@@ -46,7 +44,7 @@ class fabNacos():
             rcode = self.nacosInstall(conn, logger)
             if rcode == 0:
                 logger.info("nacos install stop.")
-                return
+                return 1
             elif rcode == 1:
                 logger.error("nacos install faild !")
                 return 1
@@ -68,26 +66,21 @@ class fabNacos():
             # 启动服务
             logger.info("start nacos server...")
             try:
-                conn.run("systemctl daemon-reload")
-                conn.run("systemctl start nacos")
-                conn.run("systemctl enable nacos")
+                conn.run("systemctl daemon-reload", hide=True)
+                conn.run("systemctl start nacos", hide=True)
+                conn.run("systemctl enable nacos", hide=True)
             except:
                 logger.error("nacos server start faild!")
                 return 1
             logger.info("start nacos server success.")
-            # 检查服务
-            self.nacosCheck(conn, logger)
 
         # 将服务信息写入文件
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  nacos standalone  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  nacos single  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
             f.write("time: {}\n".format(dtime))
-            f.write("Model: nacos-single\n")
             f.write("listen: {}:8848\n".format(host['ip']))
-            f.write("system user: nacos, password: {}\n".format(upasswd))
-            f.write("nacos path: {}\n".format(self.nacospath))
-
+            f.write("系统用户: nacos, 密码: {}\n".format(upasswd))
 
     def nacosCluster(self, hosts, logger):
         l = []
@@ -105,7 +98,7 @@ class fabNacos():
                 rcode = self.nacosInstall(conn, logger)
                 if rcode == 0:
                     logger.info("nacos install stop.")
-                    return
+                    return 1
                 elif rcode == 1:
                     logger.error("nacos install faild !")
                     return 1
@@ -127,25 +120,21 @@ class fabNacos():
                 # 启动服务
                 logger.info("start nacos server...")
                 try:
-                    conn.run("systemctl daemon-reload")
-                    conn.run("systemctl start nacos")
-                    conn.run("systemctl enable nacos")
+                    conn.run("systemctl daemon-reload", hide=True)
+                    conn.run("systemctl start nacos", hide=True)
+                    conn.run("systemctl enable nacos", hide=True)
                 except:
                     logger.error("nacos server start faild!")
                     return 1
                 logger.info("start nacos server success.")
-                # 检查服务
-                self.nacosCheck(conn, logger)
 
         # 将服务信息写入文件
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  nacos server  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  nacos cluster  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
             f.write("time: {}\n".format(dtime))
-            f.write("Model: nacos-cluster\n")
             f.write("cluster: {}:8848\n".format(":8848;".join(l)))
-            f.write("system user: nacos, password: {}\n".format(upasswd))
-            f.write("nacos path: {}\n\n".format(self.nacospath))
+            f.write("系统用户: nacos, 密码: {}\n".format(upasswd))
 
     def nacosInstall(self, conn, logger):
         # 检查java环境
@@ -153,7 +142,7 @@ class fabNacos():
         r = conn.run("[ -d {0} ] && [ -f {0}/bin/java ]".format(self.JAVAHOME), hide=True, warn=True)
         if r.exited != 0:
             logger.error("not JAVA_HOME,start install jdk...")
-            rcode = FabSpring.jdkInstall(self.pkgsdir, conn, logger)
+            rcode = FabSpring.jdkInstall(conn, logger)
             if rcode != None:
                 logger.info("jdk install faild!")
                 return 1
@@ -174,7 +163,7 @@ class fabNacos():
                 conn.put(localfile, rpath)
 
         # 检查是否已经安装
-        logger.info(">>>>>>>>>>>>>> check nacos server isn't installed <<<<<<<<<<<<<")
+        logger.info("Check whether nacos is installed...")
         r = conn.run("[ -d {0} ] && [ -f {0}/target/nacos-server.jar ]".format(self.nacospath), warn=True, hide=True)
         if r.exited == 0:
             logger.warn("nacos server is installed, please check it.")
@@ -191,10 +180,13 @@ class fabNacos():
             return 1
         logger.info("nacos install success.")
 
-    def nacosCheck(self, conn, logger, port=8848):
-        logger.info(">>>>>>>>>>>>>>> check nacos server <<<<<<<<<<<<<<")
-        try:
-            logger.info("nacos server process.")
-            conn.run("ps -ef | grep nacos | grep -v grep")
-        except:
-            logger.error("nacos server is not start!")
+
+def check_nacos(conn):
+    r = conn.run("[ -d {0} ] && [ -f {0}/target/nacos-server.jar ]".format(nacosConf.nacos_install_path), warn=True, hide=True)
+    if r.exited != 0:
+        return "未安装"
+    r = conn.run("ps -ef | grep nacos | grep -v grep", warn=True, hide=True)
+    if r.exited != 0:
+        return "已安装，未启动服务"
+    else:
+        return "服务已启动"

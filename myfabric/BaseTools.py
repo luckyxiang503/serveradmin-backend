@@ -6,14 +6,14 @@
 import os
 import datetime
 import fabric
-import SimpleFunc
 from config import settings
 
 
 msgFile = settings.serverMsgText
 
 
-def base(pkgsdir, d, logger):
+def base(d, logger):
+    pkgsdir = settings.pkgsdir
     pkgpath = os.path.join(pkgsdir, "base")
     pypkgpath = os.path.join(pkgsdir, 'pypi')
     remotepath = '/opt/pkgs/base'
@@ -32,7 +32,7 @@ def base(pkgsdir, d, logger):
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
             # 拷贝文件到远程主机
-            logger.info(">>>>> copy package to remothost <<<<<")
+            logger.info("copy package to remothost......")
             if not os.path.exists(pkgpath):
                 logger.error("local path {} not exist.".format(pkgpath))
                 return 1
@@ -62,24 +62,24 @@ def base(pkgsdir, d, logger):
 
             # 系统基线修改
             rcode = sysbaseline(remotepath, conn, logger)
-            if rcode != None:
+            if rcode is not None:
                 logger.error("systemctl baseline faild!")
                 return 1
 
             # 安装工具
-            logger.info(">>>>> create local repos <<<<<")
+            logger.info("Create local yum repos,Please wait 5-10 minutes...")
             rcode = createLocalRepo(pkgsdir, conn, logger)
-            if rcode != None:
-                logger.error("create local repos faild!")
+            if rcode is not None:
+                logger.error("create local yum repos faild!")
                 return 1
 
-            logger.info(">>>>> install tools <<<<<")
+            logger.info("Start installing tools......")
             result = {
                 'host': host['ip'],
                 'succ': [],
                 'fail': []
             }
-            logger.info("install tar unzip gcc make net-tools...")
+            logger.info("installing tar unzip gcc make net-tools...")
             conn.run("yum -y install tar unzip gcc make net-tools", warn=True, hide=True)
             r = conn.run("which python3 >/dev/null && which pip3 >/dev/null", warn=True, hide=True)
             if r != 0:
@@ -92,7 +92,7 @@ def base(pkgsdir, d, logger):
                     conn.run("pip3 install --upgrade --index-url=file://{}/simple setuptools".format(pyremotepath), hide=True, warn=True)
 
             for tool in repotools:
-                logger.info("check {} isn't installed.".format(tool))
+                logger.info("Check whether {} is installed...".format(tool))
                 r = conn.run("rpm -qa | grep {}".format(tool), warn=True, hide=True)
                 if r.exited == 0:
                     logger.info("{} is installed.".format(tool))
@@ -125,23 +125,23 @@ def base(pkgsdir, d, logger):
         f.write("time: {}\n".format(dtime))
         for r in res:
             f.write("{}\n".format(r['host']))
-            f.write("    install success: {}\n".format(" ".join(r['succ'])))
-            f.write("    install faild: {}\n".format(" ".join(r['fail'])))
+            f.write("install success: {}\n".format(" ".join(r['succ'])))
+            f.write("install faild: {}\n".format(" ".join(r['fail'])))
 
 
 def createLocalRepo(pkgsdir, conn, logger):
     #判断是否已有本地yum源
-    logger.info("check local repos")
+    logger.info("check local repos...")
     r = conn.run("yum repolist | grep -E \"^local\ +\"", warn=True, hide=True)
     if r.exited == 0:
         logger.info("yum local repos is installed.")
         return
     # 安装本地yum源
     localrepo = os.path.join(pkgsdir, 'yumrepos')
-    logger.info(">>>>> create yum local repos <<<<<")
+    logger.info("create local yum repos...")
     remoterepo = "/opt/yumrepos"
     # 拷贝文件到远程主机
-    logger.info("copy repopkgs to remothost.")
+    logger.info("copy pkgs to remothost...")
     if not os.path.exists(localrepo):
         logger.error("local path {} not exist.".format(localrepo))
         return 1
@@ -159,7 +159,7 @@ def createLocalRepo(pkgsdir, conn, logger):
     repofile = '[local]\nname=local repository\nbaseurl=file://{}\ngpgcheck=0\nenabled=1'.format(remoterepo)
     conn.run("echo '{}' > /etc/yum.repos.d/local.repo".format(repofile))
     conn.run("yum makecache", hide=True, warn=True)
-    logger.info("yum local repos create success.")
+    logger.info("create local yum repos success.")
 
 
 def sysbaseline(remotepath, conn, logger):
@@ -187,3 +187,25 @@ def sysbaseline(remotepath, conn, logger):
         logger.error("sshd restart faild!")
         return 1
     logger.info("ssh config finish.")
+
+
+def check_base_tools(conn):
+    s, f = [], []
+    for t in ['tsar', 'netdata', 'sysstat', 'iotop', 'iftop', 'dstat', 'net-tools', 'clamav']:
+        r = conn.run("rpm -ql {} &> /dev/null".format(t), warn=True, hide=True)
+        if r.exited != 0:
+            f.append(t)
+        else:
+            s.append(t)
+
+    for t in ['glances', 'asciinema']:
+        r = conn.run("which {} &> /dev/null".format(t), warn=True, hide=True)
+        if r.exited != 0:
+            f.append(t)
+        else:
+            s.append(t)
+
+    if len(f) != 0:
+        return "未安装"
+    else:
+        return "已安装"

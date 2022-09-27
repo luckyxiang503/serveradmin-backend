@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Any
 
 
 class HostBase(BaseModel):
@@ -11,6 +11,7 @@ class Host(HostBase):
     port: int
     user: str
     password: str
+    sys_version: str
 
 
 class ServerBase(BaseModel):
@@ -35,3 +36,9 @@ class ServerInstall(ServerBase):
     id: int
     host: List[Host]
     logfile: str
+
+
+class ServerCheck(BaseModel):
+    host: str
+    status: str
+    result: Any

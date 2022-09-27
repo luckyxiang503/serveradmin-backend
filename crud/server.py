@@ -46,7 +46,8 @@ def get_serverinfo_by_id(srvid: int):
                                      port=host.hosts.port,
                                      user=host.hosts.user,
                                      password=host.hosts.password,
-                                     role=host.role))
+                                     role=host.role,
+                                     sys_version=host.hosts.sys_version))
         srv = server.ServerInstall(id=s.id,
                                  srvname=s.srvname,
                                  mode=s.mode,
@@ -101,7 +102,6 @@ def delete_server(ids: List[int]):
     db = SessionLocal()
     try:
         for srvid in ids:
-            db.query(ServerHost).filter(ServerHost.server_id == srvid).delete()
             db.query(Server).filter(Server.id == srvid).delete()
         db.commit()
         return True

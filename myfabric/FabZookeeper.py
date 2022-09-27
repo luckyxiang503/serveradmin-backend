@@ -9,24 +9,22 @@ import fabric
 
 import FabSpring
 import SimpleFunc
-from config import settings
+from config import settings, zookeeperConf
 
 
 class fabZookeeper():
-    def __init__(self, pkgsdir, d, logger):
-        self.pkgsdir = pkgsdir
-        self.pkgpath = os.path.join(pkgsdir, d['srvname'])
+    def __init__(self):
+        self.pkgsdir = settings.pkgsdir
         self.remotepath = '/opt/pkgs/zookeeper'
-        mode = d['mode']
-        hosts = d['host']
-        self.zkversion = "zookeeper-3.4.14"
-        self.pkgname = "zookeeper-3.4.14.tar.gz"
-        self.zkpath = "/opt/zookeeper"
+        self.pkgname = zookeeperConf.pkg_name
+        self.zkversion = self.pkgname.replace(".tar.gz", "")
+        self.zkpath = zookeeperConf.zk_install_path
         self.msgFile = settings.serverMsgText
 
-        self.zookeeperMain(mode, hosts, logger)
-
-    def zookeeperMain(self, mode, hosts, logger):
+    def zookeeperMain(self, d, logger):
+        self.pkgpath = os.path.join(self.pkgsdir, d['srvname'])
+        mode = d['mode']
+        hosts = d['host']
         hostnum = len(hosts)
 
         if mode == 'zookeeper-single' and hostnum == 1:
@@ -40,14 +38,16 @@ class fabZookeeper():
     def zookeeperSingle(self, host, logger):
         upasswd = SimpleFunc.createpasswd()
 
-        logger.info(">>>>>>>>>>>>>>> [{}] zookeeper install start <<<<<<<<<<<<<<".format(host['ip']))
+        logger.info("=" * 40)
+        logger.info("[{}] zookeeper install start......".format(host['ip']))
+        logger.info("=" * 40)
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
             # 调用安装函数
             rcode = self.zookeeperInstall(conn, logger)
             if rcode == 0:
                 logger.info("zookeeper install stop.")
-                return
+                return 1
             elif rcode == 1:
                 logger.error("zookeeper install faild !")
                 return 1
@@ -70,26 +70,21 @@ class fabZookeeper():
             # 启动服务
             logger.info("start zookeeper server...")
             try:
-                conn.run("systemctl daemon-reload")
-                conn.run("systemctl start zookeeper")
-                conn.run("systemctl enable zookeeper")
+                conn.run("systemctl daemon-reload", hide=True)
+                conn.run("systemctl start zookeeper", hide=True)
+                conn.run("systemctl enable zookeeper", hide=True)
             except:
                 logger.error("zookeeper server start faild!")
                 return 1
             logger.info("start zookeeper server success.")
-            # 检查服务
-            # self.zookeeperCheck(conn, logger)
 
         # 将服务信息写入文件
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  zookeeper server  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  zookeeper single  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
             f.write("time: {}\n".format(dtime))
-            f.write("Model: zookeeper-single\n")
             f.write("listen: {}:2181\n".format(host['ip']))
-            f.write("system user: zookeeper, password: {}\n".format(upasswd))
-            f.write("zookeeper path: {}\n\n".format(self.zkpath))
-
+            f.write("系统用户: zookeeper, 密码: {}\n".format(upasswd))
 
     def zookeeperCluster(self, hosts, logger):
         upasswd = SimpleFunc.createpasswd()
@@ -108,14 +103,16 @@ class fabZookeeper():
         m = 1
 
         for host in hosts:
-            logger.info(">>>>>>>>>>>>>>> [{}] zookeeper install start <<<<<<<<<<<<<<".format(host['ip']))
+            logger.info("=" * 40)
+            logger.info("[{}] zookeeper install start......".format(host['ip']))
+            logger.info("=" * 40)
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 # 调用安装函数
                 rcode = self.zookeeperInstall(conn, logger)
                 if rcode == 0:
                     logger.info("zookeeper install stop.")
-                    return
+                    return 1
                 elif rcode == 1:
                     logger.error("zookeeper install faild !")
                     return 1
@@ -143,29 +140,25 @@ class fabZookeeper():
                 # 启动服务
                 logger.info("start zookeeper server...")
                 try:
-                    conn.run("systemctl daemon-reload")
-                    conn.run("systemctl start zookeeper")
-                    conn.run("systemctl enable zookeeper")
+                    conn.run("systemctl daemon-reload", hide=True)
+                    conn.run("systemctl start zookeeper", hide=True)
+                    conn.run("systemctl enable zookeeper", hide=True)
                 except:
                     logger.error("zookeeper server start faild!")
                     return 1
                 logger.info("start zookeeper server success.")
-                # 检查服务
-                self.zookeeperCheck(conn, logger)
 
         # 将服务信息写入文件
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  zookeeper server  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  zookeeper cluster  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
             f.write("time: {}\n".format(dtime))
-            f.write("Model: zookeeper-cluster\n")
             f.write("cluster: {}\n".format(", ".join(n)))
-            f.write("system user: zookeeper, password: {}\n".format(upasswd))
-            f.write("zookeeper path: {}\n\n".format(self.zkpath))
+            f.write("系统用户: zookeeper, 密码: {}\n".format(upasswd))
 
     def zookeeperInstall(self, conn, logger):
         # 检查zookeeper是否已经安装
-        logger.info("check zookeeper isn't installed...")
+        logger.info("Check whether zookeeper is installed...")
         r = conn.run("[ -d {0} ] && [ -f {0}/bin/zkServer.sh ]".format(self.zkpath), warn=True, hide=True)
         if r.exited == 0:
             logger.warn("zookeeper is installed, please check it.")
@@ -177,7 +170,7 @@ class fabZookeeper():
         r = conn.run("which java >/dev/null 2>&1 && java -version", warn=True, hide=True)
         if r.exited != 0:
             logger.error("java is not install,please install it.")
-            rcode = FabSpring.jdkInstall(self.pkgsdir, conn, logger)
+            rcode = FabSpring.jdkInstall(conn, logger)
             if rcode != None:
                 return 1
         else:
@@ -214,12 +207,13 @@ class fabZookeeper():
         if r.exited != 0:
             conn.run("echo \"export PATH=/opt/zookeeper/bin:$PATH\" >> /etc/profile")
 
-    def zookeeperCheck(self, conn, logger):
-        logger.info(">>>>>>>>>>>>>>> check zookeeper server <<<<<<<<<<<<<<")
-        try:
-            logger.info("zookeeper server process.")
-            conn.run("ps -ef | grep zookeeper | grep -v grep")
-            logger.info("zookeeper server listen port.")
-            conn.run("ss -tunlp | grep 2181")
-        except:
-            logger.error("zookeeper server is not start!")
+
+def check_zookeeper(conn):
+    r = conn.run("[ -d {0} ] && [ -f {0}/bin/zkServer.sh ]".format(zookeeperConf.zk_install_path), warn=True, hide=True)
+    if r.exited != 0:
+        return "未安装"
+    r = conn.run("ps -ef | grep zookeeper | grep -v grep", warn=True, hide=True)
+    if r.exited != 0:
+        return "已安装，未启动服务"
+    else:
+        return "服务已启动"

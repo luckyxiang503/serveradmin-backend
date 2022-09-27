@@ -3,28 +3,29 @@
     @Author    : xiang
     @CreateTime: 2022/8/5 17:35
 '''
+import datetime
 import os
 import re
-import time, datetime
-import fabric
-import SimpleFunc
+import time
 
-from config import settings
+import fabric
+
+import SimpleFunc
+from config import settings, mysqlConf
 
 
 class fabMysql():
-    def __init__(self, pkgsdir, d, logger):
+    def __init__(self):
+        self.remotepath = "/opt/pkgs/mysql"
+        self.perconapath = "/opt/pkgs/mysql/percona"
+        self.datapath = mysqlConf.datapath
+        self.msgFile = settings.serverMsgText
+
+    def mysqlMain(self, d, logger):
+        pkgsdir = settings.pkgsdir
         self.pkgpath = os.path.join(pkgsdir, d['srvname'])
         mode = d['mode']
         hosts = d['host']
-        self.remotepath = "/opt/pkgs/mysql"
-        self.perconapath = "/opt/pkgs/mysql/percona"
-        self.datapath = "/data/mysql"
-        self.msgFile = settings.serverMsgText
-
-        self.mysqlMain(mode, hosts, logger)
-
-    def mysqlMain(self, mode, hosts, logger):
         hostNum = len(hosts)
 
         # 判断部署方式
@@ -33,14 +34,13 @@ class fabMysql():
         elif mode == "mysql-1M1S" and hostNum == 2:
             self.mysql1M1S(hosts, logger)
         else:
-            print("ERROR: mysql host num is not true.")
+            logger.error("mysql host num is not true.")
             return 1
 
     def mysqlInstall(self, conn, logger):
         # 检查是否已经安装
-        logger.info(">>>>>>>>>>>>>> check msyql server isn't installed <<<<<<<<<<<<<")
-        r = conn.run(
-            "which mysqld >/dev/null 2>&1 && which mysql >/dev/null 2>&1", warn=True, hide=True)
+        logger.info("Check whether mysql is installed...")
+        r = conn.run("which mysqld >/dev/null 2>&1 && which mysql >/dev/null 2>&1", warn=True, hide=True)
         if r.exited == 0:
             logger.info("mysql server is installed, please check it.")
             return 0
@@ -48,7 +48,7 @@ class fabMysql():
             logger.info("mysql server not install.")
 
         # 拷贝文件到远程主机
-        logger.info("copy package to remothost.")
+        logger.info("copy package to remothost...")
         if not os.path.exists(self.pkgpath):
             logger.error("local path {} not exist.".format(self.pkgpath))
             return 1
@@ -69,7 +69,7 @@ class fabMysql():
             conn.run("yum -y remove mariadb mariadb-libs", warn=True, hide=True)
             conn.run("rpm -qa | grep 'mysql-community' | xargs rpm -e", warn=True, hide=True)
             with conn.cd(self.remotepath):
-                logger.info("install mysql-community...")
+                logger.info("install mysql-community, Please wait 5-10 minutes...")
                 conn.run("rpm -ih *.rpm", hide=True)
         except:
             logger.error("mysql install error!")
@@ -133,16 +133,6 @@ class fabMysql():
             return 1
         logger.info("mysql restart success.")
 
-    def checkMysql(self, conn, logger, port=3306):
-        logger.info(">>>>>>>>>>>>>>> check mysql server <<<<<<<<<<<<<<")
-        try:
-            logger.info("mysql server process.")
-            conn.run("ps -ef | grep mysql | grep -v grep")
-            logger.info("mysql server listen port.")
-            conn.run("ss -tunlp | grep mysql | grep {}".format(port))
-        except:
-            logger.error("mysql server check error!")
-
     def mysqlSingle(self, host, logger):
         # 系统用户账号密码
         mysqlpwd = SimpleFunc.createpasswd()
@@ -150,15 +140,17 @@ class fabMysql():
         rootpwd = SimpleFunc.createpasswd()
         logger.debug("mysql root passwd: {}".format(rootpwd))
 
-        logger.info(">>>>>>>>>>>>>>> [{}] mysql master install start. <<<<<<<<<<<<<<".format(host['ip']))
+        logger.info("=" * 40)
+        logger.info("[{}] mysql install......".format(host['ip']))
+        logger.info("=" * 40)
         with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
 
             # 安装mysql
             rcode = self.mysqlInstall(conn, logger)
             if rcode == 0:
-                logger.info("mysql install stop.")
-                return
+                logger.info("mysql is installed.")
+                return 1
             elif rcode == 1:
                 logger.error("mysql install faild !")
                 return 1
@@ -169,23 +161,15 @@ class fabMysql():
                 return 1
             logger.info("mysql install success")
 
-            # 检查服务
-            self.checkMysql(conn, logger)
-            time.sleep(5)
-
         # 将服务信息写入文件
         logger.info("mysql msg write to ServerMsg.txt")
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  mysql server  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  mysql single  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
             f.write("time: {}\n".format(dtime))
-            f.write("mode: single\n")
             f.write("server: {}:3306\n".format(host['ip']))
-            f.write("system user: mysql, password: {}\n".format(mysqlpwd))
-            f.write("mysql root password: {}\n".format(rootpwd))
-            f.write("configpath: /etc/my.cnf\n")
-            f.write("logpath: {}/logs\n".format(self.datapath))
-            f.write("datapath: {}/data\n\n".format(self.datapath))
+            f.write("系统用户: mysql, 密码: {}\n".format(mysqlpwd))
+            f.write("数据库 root密码: {}\n".format(rootpwd))
 
     def mysql1M1S(self, hosts, logger):
         # 系统用户密码
@@ -203,7 +187,9 @@ class fabMysql():
             logger.error("mysql cluster need hava master and slave.")
             return 1
 
-        logger.info(">>>>>>>>>>>>>>> [{}] mysql master install start. <<<<<<<<<<<<<<".format(hosts[0]['ip']))
+        logger.info("=" * 40)
+        logger.info("[{}] mysql master install......".format(hosts[0]['ip']))
+        logger.info("=" * 40)
         with fabric.Connection(host=hosts[0]['ip'], port=hosts[0]['port'], user=hosts[0]['user'],
                                connect_kwargs={"password": hosts[0]['password']}, connect_timeout=10) as conn:
 
@@ -211,7 +197,7 @@ class fabMysql():
             rcode = self.mysqlInstall(conn, logger)
             if rcode == 0:
                 logger.info("mysql install stop.")
-                return
+                return 1
             elif rcode == 1:
                 logger.error("mysql install faild !")
                 return 1
@@ -222,9 +208,7 @@ class fabMysql():
             rcode = self.mysqlInit(conn, serverid, logger, rootpwd, mysqlpwd)
             if rcode != None:
                 return 1
-            # 检查服务
-            self.checkMysql(conn, logger)
-            time.sleep(5)
+
             # 创建复制账号，并提取master bin-log日志信息
             logger.info("create mysql rep user.")
             try:
@@ -250,7 +234,9 @@ class fabMysql():
             position = positiong.group(1)
             logger.info("[{}] mysqld install sueccess.".format(hosts[0]['ip']))
 
-        logger.info(">>>>>>>>>>>>>>> [{}] mysql slave install start. <<<<<<<<<<<<<<".format(hosts[1]['ip']))
+        logger.info("=" * 40)
+        logger.info("[{}] mysql master install......".format(hosts[1]['ip']))
+        logger.info("=" * 40)
         with fabric.Connection(host=hosts[1]['ip'], port=hosts[1]['port'], user=hosts[1]['user'],
                                connect_kwargs={"password": hosts[1]['password']}, connect_timeout=10) as conn:
 
@@ -258,7 +244,7 @@ class fabMysql():
             rcode = self.mysqlInstall(conn, logger)
             if rcode == 0:
                 logger.info("mysql install stop.")
-                return
+                return 1
             elif rcode == 1:
                 logger.error("mysql install faild !")
                 return 1
@@ -269,9 +255,7 @@ class fabMysql():
             rcode = self.mysqlInit(conn, serverid, logger, rootpwd, mysqlpwd)
             if rcode != None:
                 return 1
-                # 检查服务
-            self.checkMysql(conn, logger)
-            time.sleep(5)
+
             # 启用slave
             logger.info("slave config and starting.")
             try:
@@ -290,14 +274,21 @@ class fabMysql():
         # 将服务信息写入文件
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  Mysql server  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  Mysql 1M1S  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
             f.write("time: {}\n".format(dtime))
-            f.write("mode: 1M1S\n")
             f.write("master: {}:3306\n".format(hosts[0]['ip']))
             f.write("slave: {}:3306\n".format(hosts[1]['ip']))
-            f.write("system user: mysql, password: {}\n".format(mysqlpwd))
-            f.write("mysql root password: {}\n".format(rootpwd))
-            f.write("mysql rep password: {}\n".format(reppwd))
-            f.write("configpath: /etc/my.cnf\n")
-            f.write("logpath: {}/logs\n".format(self.datapath))
-            f.write("datapath: {}/data\n\n".format(self.datapath))
+            f.write("系统用户: mysql, 密码: {}\n".format(mysqlpwd))
+            f.write("数据库 root账号密码: {}\n".format(rootpwd))
+            f.write("数据库 rep账号密码：{}\n".format(reppwd))
+
+
+def check_mysql(conn):
+    r = conn.run("which mysqld >/dev/null && rpm -ql mysql-community >/dev/null", warn=True, hide=True)
+    if r.exited != 0:
+        return "未安装"
+    r = conn.run("ps -ef | grep mysql | grep -v grep", warn=True, hide=True)
+    if r.exited != 0:
+        return "已安装，未启动服务"
+    else:
+        return "服务已启动"

@@ -8,62 +8,63 @@ import datetime
 import fabric
 import SimpleFunc
 
-from config import settings
+from config import settings, mongoConf
 
 
-class fabMongodb():
-    def __init__(self, pkgsdir, d, logger):
-        self.pkgpath = os.path.join(pkgsdir, d['srvname'])
+class fabMongodb:
+    def __init__(self):
         self.remotepath = "/opt/pkgs/mongodb"
-        self.installpath = "/usr/local/mongodb"
-        self.datapath = "/opt/mongodb"
-        self.logpath = "/var/log/mongodb"
-        self.confpath = "/etc/mongodb"
-        self.cludatapath = "/opt/mongodb-cluster"
-        self.cluconfpath = "/etc/mongodb-cluster"
-        self.clulogpath = "/var/log/mongod-cluster"
-        self.mongopkgname = "mongodb-linux-x86_64-rhel70-5.0.10"
-        self.mongoshellpkgname = "mongodb-shell-linux-x86_64-rhel70-5.0.10"
+        self.installpath = mongoConf.install_path
+        self.datapath = mongoConf.data_path
+        self.logpath = mongoConf.log_path
+        self.confpath = mongoConf.conf_path
+        self.cludatapath = mongoConf.clu_data_path
+        self.cluconfpath = mongoConf.clu_conf_path
+        self.clulogpath = mongoConf.clu_log_path
+        self.mongopkgname = mongoConf.mongo_pkg_name
+        self.mongoshellpkgname = mongoConf.mongoShell_pkg_name
         self.msgFile = settings.serverMsgText
 
-        self.mongodbMain(d, logger)
-
     def mongodbMain(self, d, logger):
+        pkgsdir = settings.pkgsdir
+        self.pkgpath = os.path.join(pkgsdir, d['srvname'])
         mode = d['mode']
         hosts = d['host']
         hostnum = len(hosts)
 
         if mode == "mongodb-single" and hostnum == 1:
             self.mongodbSingle(hosts[0], logger)
-        elif mode == "mongodb-sharding":
+        elif mode == "mongodb-sharding" and hostnum == 3:
             self.mongodbSharding(hosts, logger)
         else:
-            print("ERROR: host num or mode is not true!")
+            logger.error("host num or mode is not true!")
             return 1
 
     def mongodbSingle(self, host, logger):
         mongodpwd = SimpleFunc.createpasswd()
 
         # 连接远程机器
-        logger.info(">>>>>>>>>>>>>>> mongodb install start <<<<<<<<<<<<<<")
+        logger.info("=" * 40)
+        logger.info("[{}] mongodb install......".format(host['ip']))
+        logger.info("=" * 40)
         conn = fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                  connect_kwargs={"password": host['password']}, connect_timeout=10)
         # 调用安装函数
         rcode = self.mongodbInstall(conn, logger)
         if rcode == 0:
-            logger.info("mongodb install stop.")
-            return
+            logger.error("mongodb is installed !")
+            return 1
         elif rcode == 1:
             logger.error("mongodb install faild !")
             return 1
         logger.info("mongodb install success")
 
         # 创建用户
-        logger.info("create user mongod")
+        logger.info("Create System User: mongod")
         conn.run("id mongod >/dev/null 2>&1 || useradd mongod", warn=True, hide=True)
         conn.run("echo '{}' | passwd --stdin mongod".format(mongodpwd), warn=True, hide=True)
         # 创建数据目录
-        logger.info("create data path...")
+        logger.info("Create data path...")
         conn.run("mkdir -p {} {} {} /var/run/mongodb".format(self.confpath, self.logpath, self.datapath), warn=True)
         # 拷贝文件
         logger.info("copy mongod.conf...")
@@ -84,20 +85,14 @@ class fabMongodb():
             return 1
         logger.info("mongodb start success.")
 
-        logger.info("check mongod server...")
-        self.mongodbCheck(conn, logger)
         # 将服务信息写入文件
         logger.info("mongodb msg write to ServerMsg.txt")
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  MongoDB server  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  MongoDB single  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
             f.write("time: {}\n".format(dtime))
-            f.write("mode: single\n")
             f.write("Listen: {}:27017\n".format(host['ip']))
-            f.write("system user: mongod, password: {}\n".format(mongodpwd))
-            f.write("configpath: {}\n".format(self.confpath))
-            f.write("logpath: {}\n".format(self.logpath))
-            f.write("datapath: {}\n\n".format(self.datapath))
+            f.write("系统用户: mongod, 密码: {}\n".format(mongodpwd))
 
     def mongodbSharding(self, hosts, logger):
         mongodpwd = SimpleFunc.createpasswd()
@@ -110,14 +105,16 @@ class fabMongodb():
 
         for host in hosts:
             # 连接远程机器
-            logger.info(">>>>>>>>>>>>>> [{}] mongodb install start <<<<<<<<<<<<<<".format(host['ip']))
+            logger.info("=" * 40)
+            logger.info("[{}] mongodb install......".format(host['ip']))
+            logger.info("=" * 40)
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 # 调用安装函数
                 rcode = self.mongodbInstall(conn, logger)
                 if rcode == 0:
-                    logger.info("mongodb install stop.")
-                    return
+                    logger.error("mongodb is installed !")
+                    return 1
                 elif rcode == 1:
                     logger.error("mongodb install faild !")
                     return 1
@@ -142,7 +139,7 @@ class fabMongodb():
                 conn.run("chown -R mongod:mongod {} {} {}".format(self.clulogpath, self.cludatapath, self.cluconfpath))
                 for i in ['shard1', 'shard2', 'shard3']:
                     logger.info("copy {} service file...".format(i))
-                    conn.run("cp -f {}/mongod-shard.service /lib/systemd/system/mongod-{}.service".format(self.remotepath, i))
+                    conn.run("cp -f {}/mongod-shard.service /lib/systemd/system/mongod-{}.service".format(self.remotepath, i), warn=True)
                     conn.run("sed -i 's/shard1/{0}/g' /lib/systemd/system/mongod-{0}.service".format(i), warn=True)
                     logger.info("starting shardsrv {}....".format(i))
                     try:
@@ -184,9 +181,6 @@ class fabMongodb():
                     "cp -f {}/mongod-mongos.service /lib/systemd/system/mongod-mongos.service".format(self.remotepath))
                 conn.run("chown -R mongod:mongod {} {} {}".format(self.clulogpath, self.cludatapath, self.cluconfpath))
 
-                logger.info(">>>>>>>>>>>>>>>>  check mongo server  <<<<<<<<<<<<<<<")
-                self.mongodbCheck(conn, logger)
-
         logger.info(">>>>>>>>>>>>>>>>>>> mongodb cluster init  <<<<<<<<<<<<<<<<<<<<<<")
         # 创建config repset
         host = hosts[0]
@@ -220,6 +214,9 @@ class fabMongodb():
 
         # mongos 服务启动与配置分片路由
         for host in hosts:
+            logger.info("=" * 40)
+            logger.info("[{}] mongodb install......".format(host['ip']))
+            logger.info("=" * 40)
             with fabric.Connection(host=host['ip'], port=host['port'], user=host['user'],
                                    connect_kwargs={"password": host['password']}, connect_timeout=10) as conn:
                 logger.info("[{}] starting mongos....".find(host['ip']))
@@ -245,24 +242,19 @@ class fabMongodb():
                     except:
                         logger.error("mongodb mongos {} init faild！".format(h))
                         return 1
-                self.mongodbCheck(conn, logger)
 
         # 将服务信息写入文件
         with open(self.msgFile, 'a+', encoding='utf-8') as f:
             dtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  MongoDB server  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
+            f.write(">>>>>>>>>>>>>>>>>>>>>>>>>  MongoDB sharding  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n")
             f.write("time: {}\n".format(dtime))
-            f.write("Model: mongodb-sharding\n")
-            f.write("mongodb: {}\n".format(";".join(H)))
+            f.write("ip: {}\n".format(";".join(H)))
             f.write("port: 27000,27001,27002,27003,27017\n")
-            f.write("system user: mongod, passwd: {}\n".format(mongodpwd))
-            f.write("configpath: {}/[shard1,shard2,shard3,configsrv,mongos]\n".format(self.cluconfpath))
-            f.write("logpath: {}/[shard1,shard2,shard3,configsrv,mongos]\n".format(self.clulogpath))
-            f.write("datapath: {}/[shard1,shard2,shard3,configsrv]\n\n".format(self.cludatapath))
+            f.write("系统用户: mongod, 密码: {}\n".format(mongodpwd))
 
     def mongodbInstall(self, conn, logger):
         # 检查是否已经安装
-        logger.info(">>>>>>>>>>>>>> check mongodb server isn't installed <<<<<<<<<<<<<")
+        logger.info("Check whether mongodb is installed...")
         r = conn.run("[ -f {0}/bin/mongod ] && [ -f {0}/bin/mongos ]".format(self.installpath), warn=True, hide=True)
         if r.exited == 0:
             logger.info("mongodb server is installed, please check it.")
@@ -300,12 +292,13 @@ class fabMongodb():
             return 1
         logger.info("mongodb install success.")
 
-    def mongodbCheck(self, conn, logger):
-        logger.info(">>>>>>>>>>>>>>> check mongod server <<<<<<<<<<<<<<")
-        try:
-            logger.info("mongod server process.")
-            conn.run("ps -ef | grep mongod | grep -v grep")
-            logger.info("mongod server listen port.")
-            conn.run("ss -tunlp | grep mongo")
-        except Exception as e:
-            logger.error(e)
+
+def check_mongodb(conn):
+    r = conn.run("[ -f {0}/bin/mongod ] && [ -f {0}/bin/mongos ]".format(mongoConf.install_path), warn=True, hide=True)
+    if r.exited != 0:
+        return "未安装"
+    r = conn.run("ps -ef | grep mongo | grep -v grep", warn=True, hide=True)
+    if r.exited != 0:
+        return "已安装，未启动服务"
+    else:
+        return "服务已启动"
