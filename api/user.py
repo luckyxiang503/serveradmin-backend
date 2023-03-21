@@ -13,7 +13,8 @@ user = APIRouter(tags=['用户相关'], dependencies=[Depends(get_current_user)]
 
 @user.get("/user", summary='用户信息', response_model=UserBase)
 async def get_user_info(username: str):
-    if db_user := get_user_by_name(username):
+    db_user = get_user_by_name(username)
+    if db_user is not None:
         return db_user
     raise HTTPException(status_code=404, detail="用户不存在")
 

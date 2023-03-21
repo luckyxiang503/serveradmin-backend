@@ -46,6 +46,8 @@ class ServerHost(Base):
     host_id = Column(Integer, ForeignKey('hosts.id', ondelete='CASCADE'))
     server_id = Column(Integer, ForeignKey('server.id', ondelete='CASCADE'))
     role = Column(String(20), comment="主机角色")
+    appname = Column(String(20), comment="app账号")
+    tag = Column(String(20), comment="consul组名")
 
     hosts = relationship('Host', uselist=False, backref="serverhost")
 

@@ -7,13 +7,12 @@ import os
 import datetime
 
 import fabric
-import SimpleFunc, FabSpring
+import SimpleFunc, FabApp
 from config import settings, nacosConf
 
 
 class fabNacos():
     def __init__(self):
-
         self.remotepath = "/opt/pkgs/nacos"
         self.nacospath = nacosConf.nacos_install_path
         self.nacospkgname = nacosConf.nacos_pkg_name
@@ -144,7 +143,7 @@ class fabNacos():
         r = conn.run("[ -d {0} ] && [ -f {0}/bin/java ]".format(self.JAVAHOME), hide=True, warn=True)
         if r.exited != 0:
             logger.error("not JAVA_HOME,start install jdk...")
-            rcode = FabSpring.jdkInstall(conn, logger)
+            rcode = FabApp.jdkInstall(conn, logger)
             if rcode != None:
                 logger.info("jdk install faild!")
                 return 1
@@ -156,12 +155,13 @@ class fabNacos():
             return 1
         conn.run("[ -d {0} ] && rm -rf {0}/*".format(self.remotepath), warn=True, hide=True)
         # 遍历目录文件并上传到服务器
+        logger.info("upload {} files to remote host...".format(self.pkgpath))
         for root, dirs, files in os.walk(self.pkgpath):
             rpath = root.replace(self.pkgpath, self.remotepath).replace('\\', '/')
             conn.run("mkdir -p {}".format(rpath))
             for file in files:
                 localfile = os.path.join(root, file)
-                logger.info("put file: {} to {}".format(localfile, rpath))
+                # logger.info("put file: {} to {}".format(localfile, rpath))
                 conn.put(localfile, rpath)
 
         # 检查是否已经安装

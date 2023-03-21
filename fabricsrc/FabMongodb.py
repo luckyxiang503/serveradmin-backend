@@ -271,12 +271,13 @@ class fabMongodb:
             return 1
         conn.run("[ -d {0} ] && rm -rf {0}/*".format(self.remotepath), warn=True, hide=True)
         # 遍历目录文件并上传到服务器
+        logger.info("upload {} files to remote host...".format(self.pkgpath))
         for root, dirs, files in os.walk(self.pkgpath):
             rpath = root.replace(self.pkgpath, self.remotepath).replace('\\', '/')
             conn.run("mkdir -p {}".format(rpath))
             for file in files:
                 localfile = os.path.join(root, file)
-                logger.info("put file: {} to {}".format(localfile, rpath))
+                # logger.info("put file: {} to {}".format(localfile, rpath))
                 conn.put(localfile, rpath)
 
         # 安装mongodb

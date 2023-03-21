@@ -8,12 +8,11 @@ import datetime
 import fabric
 from config import settings
 
-
 msgFile = settings.serverMsgText
+pkgsdir = settings.pkgsdir
 
 
 def base(d, logger):
-    pkgsdir = settings.pkgsdir
     pkgpath = os.path.join(pkgsdir, "base")
     pypkgpath = os.path.join(pkgsdir, 'pypi')
     remotepath = '/opt/pkgs/base'
@@ -43,7 +42,7 @@ def base(d, logger):
                 conn.run("mkdir -p {}".format(rpath))
                 for file in files:
                     localfile = os.path.join(root, file)
-                    logger.info("put file: {} to {}".format(localfile, rpath))
+                    #logger.info("put file: {} to {}".format(localfile, rpath))
                     conn.put(localfile, rpath)
 
             # 拷贝pypi文件到远程主机
@@ -52,23 +51,24 @@ def base(d, logger):
                 return 1
             conn.run("[ -d {0} ] && rm -rf {0}/*".format(pyremotepath), warn=True, hide=True)
             # 遍历目录文件并上传到服务器
+            logger.info("copy python package to remothost...")
             for root, dirs, files in os.walk(pypkgpath):
                 rpath = root.replace(pypkgpath, pyremotepath).replace('\\', '/')
                 conn.run("mkdir -p {}".format(rpath))
                 for file in files:
                     localfile = os.path.join(root, file)
-                    logger.info("put file: {} to {}".format(localfile, rpath))
+                    #logger.info("put file: {} to {}".format(localfile, rpath))
                     conn.put(localfile, rpath)
 
             # 系统基线修改
-            rcode = sysbaseline(remotepath, conn, logger)
+            rcode = sysbaseline(conn, logger)
             if rcode is not None:
                 logger.error("systemctl baseline faild!")
                 return 1
 
             # 安装工具
             logger.info("Create local yum repos,Please wait 5-10 minutes...")
-            rcode = createLocalRepo(pkgsdir, conn, logger)
+            rcode = createyumrepos(conn, logger)
             if rcode is not None:
                 logger.error("create local yum repos faild!")
                 return 1
@@ -79,8 +79,8 @@ def base(d, logger):
                 'succ': [],
                 'fail': []
             }
-            logger.info("installing tar unzip gcc make net-tools...")
-            conn.run("yum -y install tar unzip gcc make net-tools", warn=True, hide=True)
+            logger.info("installing wget tar unzip gcc make net-tools iptables-services...")
+            conn.run("yum -y install wget tar unzip gcc make net-tools iptables-services", warn=True, hide=True)
             r = conn.run("which python3 >/dev/null && which pip3 >/dev/null", warn=True, hide=True)
             if r != 0:
                 logger.info("install python3")
@@ -107,6 +107,13 @@ def base(d, logger):
                 else:
                     logger.info("{} install success".format(tool))
                     result['succ'].append(tool)
+                if tool == 'netdata':
+                    conn.run("sed -i 's/\(bind to =\).*/\\1 0.0.0.0/' /etc/netdata/netdata.conf", warn=True, hide=True)
+                    r = conn.run("systemctl start netdata && systemctl enable netdata")
+                    if r.exited == 0:
+                        logger.info("netdata server start success.")
+                    else:
+                        logger.error("netdata server start filad.")
 
             for tool in piptools:
                 logger.info("install {}.......".format(tool))
@@ -129,19 +136,55 @@ def base(d, logger):
             f.write("install faild: {}\n".format(" ".join(r['fail'])))
 
 
-def createLocalRepo(pkgsdir, conn, logger):
-    #判断是否已有本地yum源
-    logger.info("check local repos...")
+def sysbaseline(conn, logger):
+    logger.info(">>>>> system base line <<<<<")
+    logger.info("selinux ......")
+    conn.run("setenforce 0", hide=True, warn=True)
+    conn.run("sed -i 's/= *enforcing/=permissive/g' /etc/selinux/config", warn=True, hide=True)
+    logger.info("selinu finish.")
+    logger.info("stop firewalld")
+    conn.run("systemctl stop firewalld && systemctl disable firewalld", warn=True, hide=True)
+    logger.info("finish.")
+
+    logger.info("system passwd rules ......")
+    conn.run("sed -i  's/^\(PASS_MAX_DAYS\).*/\\1   90/' /etc/login.defs", warn=True, hide=True)
+    conn.run("sed -i   's/^\(PASS_MIN_DAYS\).*/\\1   3/'  /etc/login.defs", warn=True, hide=True)
+    conn.run("ssed -i  's/^\(PASS_MIN_LEN\).*/\\1   10/'  /etc/login.defs", warn=True, hide=True)
+    conn.run("sed -i   's/^\(PASS_WARN_AGE\).*/\\1   10/'  /etc/login.defs", warn=True, hide=True)
+    r = conn.run("grep \"^SU_WHEEL_ONLY\" /etc/login.defs", warn=True, hide=True)
+    if r.exited != 0:
+        conn.run("sed -i '/UMASK/a\SU_WHEEL_ONLY     yes' /etc/login.defs", warn=True, hide=True)
+    r = conn.run("grep -E \"^auth\ +required\ +pam_tally2.so\ +deny=3\ +unlock_time=300\" /etc/pam.d/sshd", warn=True, hide=True)
+    if r.exited != 0:
+        conn.run("sed -i '/#%PAM-1.0/aauth required pam_tally2.so deny=3 unlock_time=300 root_unlock_time=10' /etc/pam.d/sshd", warn=True, hide=True)
+    r = conn.run("grep -E \"^password\ +requisite\ +pam_cracklib.so retry=3 difok=3 minlen=10 ucredit=-1 lcredit=-2 dcredit=-1 ocredit=-1\" /etc/pam.d/system-auth", warn=True, hide=True)
+    if r.exited != 0:
+        conn.run("sed -i '/password    required      pam_deny.so/apassword    requisite    pam_cracklib.so retry=3 difok=3 minlen=10 ucredit=-1 lcredit=-2 dcredit=-1 ocredit=-1' /etc/pam.d/system-auth", warn=True, hide=True)
+    r = conn.run("grep -E \"^password\ +sufficient.*remember=.*\"  /etc/pam.d/system-auth", warn=True, hide=True)
+    if r.exited != 0:
+        conn.run("sed -i 's/\(password    sufficient    pam_unix.so.*\)/\\1 remember=5/' /etc/pam.d/system-auth", warn=True, hide=True)
+
+    logger.info("limit nofile ......")
+    r = conn.run("grep -E \"^*[ ]+(soft|hard)[ ]+nofile[ ]+65535\" /etc/security/limits.conf", warn=True, hide=True)
+    if r.exited != 0:
+        conn.run("cp -f /etc/security/limits.conf /etc/security/limits.conf_`date +%F-%H%M%S`", warn=True)
+        conn.run("echo \"*          soft    nofile     65535\" >> /etc/security/limits.conf", warn=True)
+        conn.run("echo \"*          hard    nofile     65535\" >> /etc/security/limits.conf", warn=True)
+    logger.info("limit nofile finish.")
+
+
+def createyumrepos(conn, logger):
+    # 安装本地yum源
+    logger.info("check local repos, Please wait 5-10 minutes...")
     r = conn.run("yum repolist | grep -E \"^local\ +\"", warn=True, hide=True)
     if r.exited == 0:
         logger.info("yum local repos is installed.")
         return
-    # 安装本地yum源
-    localrepo = os.path.join(pkgsdir, 'yumrepos')
-    logger.info("create local yum repos...")
+    localrepo = "{}/yumrepos".format(pkgsdir)
+    logger.info("create yum local repos, Please wait 3-5 minutes...")
     remoterepo = "/opt/yumrepos"
     # 拷贝文件到远程主机
-    logger.info("copy pkgs to remothost...")
+    logger.info("copy repopkgs to remothost.")
     if not os.path.exists(localrepo):
         logger.error("local path {} not exist.".format(localrepo))
         return 1
@@ -152,41 +195,14 @@ def createLocalRepo(pkgsdir, conn, logger):
         conn.run("mkdir -p {}".format(repopath))
         for file in files:
             localfile = os.path.join(root, file)
-            logger.info("put file: {} to {}".format(localfile, repopath))
+            # logger.info("put file: {} to {}".format(localfile, repopath))
             conn.put(localfile, repopath)
-
-    logger.info("create local.repo")
+    logger.info("create local.repo...")
     repofile = '[local]\nname=local repository\nbaseurl=file://{}\ngpgcheck=0\nenabled=1'.format(remoterepo)
     conn.run("echo '{}' > /etc/yum.repos.d/local.repo".format(repofile))
+    logger.info("yum makecache...")
     conn.run("yum makecache", hide=True, warn=True)
-    logger.info("create local yum repos success.")
-
-
-def sysbaseline(remotepath, conn, logger):
-    logger.info(">>>>> system base line <<<<<")
-    logger.info("selinux ......")
-    conn.run("setenforce 0", hide=True, warn=True)
-    conn.run("sed -i 's/= *enforcing/=permissive/g' /etc/selinux/config", warn=True, hide=True)
-    logger.info("selinu finish.")
-
-    logger.info("limit nofile ......")
-    r = conn.run("grep -E \"^*[ ]+(soft|hard)[ ]+nofile[ ]+65535\" /etc/security/limits.conf", warn=True, hide=True)
-    if r.exited != 0:
-        conn.run("cp -f /etc/security/limits.conf /etc/security/limits.conf_`date +%F-%H%M%S`", warn=True)
-        conn.run("echo \"*          soft    nofile     65535\" >> /etc/security/limits.conf", warn=True)
-        conn.run("echo \"*          hard    nofile     65535\" >> /etc/security/limits.conf", warn=True)
-    logger.info("limit nofile finish.")
-
-    logger.info("ssh config ......")
-    conn.run("cp -f /etc/ssh/sshd_config /etc/ssh/sshd_config_`date +%F-%H%M%S`", warn=True)
-    conn.run("cp -f {}/sshd_config /etc/ssh/".format(remotepath), warn=True)
-    conn.run("cp -f {}/ssh_banner /etc/".format(remotepath), warn=True)
-    try:
-        conn.run("systemctl restart sshd".format(remotepath))
-    except:
-        logger.error("sshd restart faild!")
-        return 1
-    logger.info("ssh config finish.")
+    logger.info("yum local repos create success.")
 
 
 def check_base_tools(conn):

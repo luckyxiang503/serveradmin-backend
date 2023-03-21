@@ -8,7 +8,7 @@ import os
 import time
 import fabric
 
-import FabSpring
+import FabApp
 import SimpleFunc
 from config import settings, rocketmqConf
 
@@ -17,11 +17,11 @@ class fabRocketmq:
     def __init__(self):
         self.remotepath = "/opt/pkgs/rocketmq"
         self.rocketmqPath = rocketmqConf.rocketmq_install_path
+        self.confpath = rocketmqConf.conf_path
         self.datapath = rocketmqConf.data_path
-        self.logpath = rocketmqConf.log_path
         self.zippkgname = rocketmqConf.pkg_name
         self.consolepkgname = rocketmqConf.console_pkg_name
-        self.consolepath = rocketmqConf.rocketmq_install_path
+        self.consolepath = rocketmqConf.console_install_path
         self.xms = rocketmqConf.xms
         self.xmx = rocketmqConf.xmx
         self.xmn = rocketmqConf.xmn
@@ -38,8 +38,8 @@ class fabRocketmq:
         if mode == 'rocketmq-single' and hostnum == 1:
             if self.rocketmqSingle(hosts[0], logger) is not None:
                 return 1
-        elif mode == 'rocketmq-nM' and hostnum > 1:
-            if self.rocketmqnM(hosts, logger) is not None:
+        elif mode == 'rocketmq-1M2S' and hostnum > 1:
+            if self.rocketmq1M2S(hosts, logger) is not None:
                 return 1
         else:
             print("ERROR: rocketMQ mode is not true.")
@@ -58,7 +58,7 @@ class fabRocketmq:
         r = conn.run("[ -d {0} ] && [ -f {0}/bin/java ]".format(self.JAVAHOME), hide=True, warn=True)
         if r.exited != 0:
             logger.error("No JAVA_HOME,start install jdk...")
-            rcode = FabSpring.jdkInstall(conn, logger)
+            rcode = FabApp.jdkInstall(conn, logger)
             if rcode != None:
                 logger.info("jdk install faild!")
                 return 1
@@ -77,12 +77,13 @@ class fabRocketmq:
             return 1
         conn.run("[ -d {0} ] && rm -rf {0}/*".format(self.remotepath), warn=True, hide=True)
         # 遍历目录文件并上传到服务器
+        logger.info("upload {} files to remote host...".format(self.pkgpath))
         for root, dirs, files in os.walk(self.pkgpath):
             rpath = root.replace(self.pkgpath, self.remotepath).replace('\\', '/')
             conn.run("mkdir -p {}".format(rpath))
             for file in files:
                 localfile = os.path.join(root, file)
-                logger.info("put file: {} to {}".format(localfile, rpath))
+                # logger.info("put file: {} to {}".format(localfile, rpath))
                 conn.put(localfile, rpath)
 
         # 解压
@@ -115,8 +116,6 @@ class fabRocketmq:
             conn.run("sed -i 's/Xmx[0-9]g/Xmx{}/g' runbroker.sh".format(self.xmx), warn=True, hide=True)
             conn.run("sed -i 's/Xmn[0-9]g/Xmn{}/g' runbroker.sh".format(self.xmn), warn=True, hide=True)
 
-        # 修改日志目录
-        conn.run("sed -i 's#{}/logs/rocketmqlogs#{}#g' {}/conf/logback_*.xml".format("\${user.home}", self.logpath,self.rocketmqPath), warn=True)
 
     def rocketmqSingle(self, host, logger):
         logger.info("=" * 40)
@@ -139,12 +138,12 @@ class fabRocketmq:
             upasswd = SimpleFunc.createpasswd()
             conn.run("echo '{}' | passwd --stdin rocketmq".format(upasswd), warn=True, hide=True)
             conn.run("[ -d {0} ] || mkdir -p {0}".format(self.datapath), warn=True, hide=True)
-            conn.run("[ -d {0} ] || mkdir -p {0}".format(self.logpath), warn=True, hide=True)
+            conn.run("chown -R rocketmq:rocketmq {}".format(self.datapath), warn=True, hide=True)
+            conn.run("chown -R rocketmq:rocketmq {}".format(self.rocketmqPath), warn=True, hide=True)
             # 拷贝配置文件和启动脚本
             logger.info("copy conf file...")
             conn.run("[ -d {0}/conf/broker.conf ] && mv {0}/conf/broker.conf {0}/conf/broker.conf_bak_`date +%F`".format(self.rocketmqPath), warn=True)
             conn.run("cp -f {}/broker.conf {}/conf/".format(self.remotepath, self.rocketmqPath), warn=True)
-            conn.run("chown -R rocketmq:rocketmq {} {} {}".format(self.rocketmqPath, self.logpath, self.datapath))
 
             logger.info("copy service file...")
             conn.run("cp -f {}/rocketmq-console.service /lib/systemd/system/".format(self.remotepath), warn=True)
@@ -177,7 +176,7 @@ class fabRocketmq:
             f.write("rocketmq broker: {}:10911\n".format(host['ip']))
             f.write("系统用户: rocketmq, 密码: {}\n".format(upasswd))
 
-    def rocketmqnM(self, hosts, logger):
+    def rocketmq1M2S(self, hosts, logger):
         upasswd = SimpleFunc.createpasswd()
         namesrvaddr = ""
         brokeraddr = ""
@@ -211,17 +210,15 @@ class fabRocketmq:
                 conn.run("id -u rocketmq >/dev/null 2>&1 || useradd rocketmq", warn=True, hide=True)
                 conn.run("echo '{}' | passwd --stdin rocketmq".format(upasswd), warn=True, hide=True)
                 conn.run("[ -d {0} ] || mkdir -p {0}".format(self.datapath), warn=True, hide=True)
-                conn.run("[ -d {0} ] || mkdir -p {0}".format(self.logpath), warn=True, hide=True)
+                conn.run("chown -R rocketmq:rocketmq {}".format(self.datapath), warn=True, hide=True)
+                conn.run("chown -R rocketmq:rocketmq {}".format(self.rocketmqPath), warn=True, hide=True)
                 # 拷贝配置文件和启动脚本
                 logger.info("copy broker.conf file to {}/conf/...".format(self.rocketmqPath))
-                conn.run("[ -d {0}/conf/broker.conf ] && mv {0}/conf/broker.conf {0}/conf/broker.conf_bak_`date +%F_%H%M%S`".format(self.rocketmqPath), warn=True)
-                conn.run("cp -f {}/broker.conf {}/conf/".format(self.remotepath, self.rocketmqPath), warn=True)
-                conn.run("sed -i 's/\\(namesrvAddr=\\).*/\\1{}/' {}/conf/broker.conf".format(namesrvaddr, self.rocketmqPath), warn=True)
-                conn.run("sed -i 's/\\(brokerName=\\).*/\\1broker-{}/' {}/conf/broker.conf".format(s, self.rocketmqPath), warn=True)
-                conn.run("sed -i 's/\\(dLegerGroup=\\).*/\\1broker-{}/' {}/conf/broker.conf".format(s, self.rocketmqPath), warn=True)
-                conn.run("sed -i 's/\\(dLegerPeers=\\).*/\\1{}/' {}/conf/broker.conf".format(dLegerPeer, self.rocketmqPath), warn=True)
-                conn.run("sed -i 's/\\(dLegerSelfId=\\).*/\\1n{}/' {}/conf/broker.conf".format(host['SelfId'], self.rocketmqPath), warn=True)
-                conn.run("chown -R rocketmq:rocketmq {} {} {}".format(self.rocketmqPath, self.datapath, self.logpath))
+
+                conn.run("cp -f {}/broker.conf {}/brokerA.conf".format(self.remotepath, self.confpath), warn=True)
+                conn.run("sed -i 's/\\(namesrvAddr=\\).*/\\1{}/' {}/brokerA.conf".format(namesrvaddr, self.confpath), warn=True)
+                conn.run("sed -i 's/\\(dLegerPeers=\\).*/\\1{}/' {}/brokerA.conf".format(dLegerPeer, self.confpath), warn=True)
+                conn.run("sed -i 's/\\(dLegerSelfId=\\).*/\\1n{}/' {}/brokerA.conf".format(host['SelfId'], self.confpath), warn=True)
 
                 logger.info("copy service file...")
                 conn.run("cp -f {}/rocketmq-console.service /lib/systemd/system/".format(self.remotepath), warn=True)
@@ -238,8 +235,9 @@ class fabRocketmq:
                     conn.run("systemctl start rocketmq-broker", hide=True)
                     conn.run("systemctl enable rocketmq-broker", hide=True)
                     time.sleep(5)
-                    conn.run("systemctl start rocketmq-console", hide=True)
-                    conn.run("systemctl enable rocketmq-console", hide=True)
+                    if host['SelfId'] == 0:
+                        conn.run("systemctl start rocketmq-console", hide=True)
+                        conn.run("systemctl enable rocketmq-console", hide=True)
                 except:
                     logger.error("rocketMQ server start faild!")
                     return 1

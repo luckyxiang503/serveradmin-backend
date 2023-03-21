@@ -1,5 +1,7 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from typing import List
+from fastapi.responses import FileResponse
 
 from core.security import get_current_user
 from core.server import install_server, delete_logfile, host_srv_check
@@ -8,9 +10,10 @@ from schemas.host import Host
 from schemas.base import Response200
 from crud.server import save_server_info, get_all_server_info, delete_server, get_serverinfo_by_id
 from crud.host import get_host_by_ip
+from config import settings
 
-# server = APIRouter(tags=["服务安装相关"], dependencies=[Depends(get_current_user)])
-server = APIRouter(tags=["服务安装相关"])
+server = APIRouter(tags=["服务安装相关"], dependencies=[Depends(get_current_user)])
+# server = APIRouter(tags=["服务安装相关"])
 
 
 @server.post("/srvsaveinfo", summary='服务信息保存', response_model=Response200)
@@ -51,9 +54,19 @@ async def server_check(srvcheckinfo: ServerCheck):
     host: Host = get_host_by_ip(srvcheckinfo.host)
     if host is None:
         return HTTPException(status_code=404, detail="主机不存在")
-    if data := host_srv_check(host):
+    data = host_srv_check(host)
+    if data:
         srvcheckinfo.status = '正常'
         srvcheckinfo.result = data
     else:
         srvcheckinfo.status = "连接失败"
     return srvcheckinfo
+
+
+@server.get("/download", summary="下载日志文件")
+async def download_log_file(filename: str):
+    file = os.path.join(settings.logpath, filename)
+    if os.path.isfile(file):
+        return FileResponse(file)
+    else:
+        raise HTTPException(status_code=404, detail="文件不存在")

@@ -2,7 +2,7 @@ from datetime import datetime
 import fabric
 
 from config import settings
-from myfabric import *
+from fabricsrc import *
 from crud.server import update_server
 from schemas.server import ServerInstall
 from schemas.host import Host
@@ -28,35 +28,37 @@ def fabric_install(srv):
     logger = SimpleFunc.FileLog(name="{}_{}".format(srv.srvname, srv.id), logfile=srv.logfile)
     s = srv.dict()
     try:
-        if srv.srvname == 'base':
+        if s['srvname'] == 'base':
             rcode = BaseTools.base(s, logger)
-        elif srv.srvname == "redis":
-            redis = FabRedis.fabRedis()
-            rcode = redis.redisMain(s, logger)
-        elif srv.srvname == "mysql":
-            mysql = FabMysql.fabMysql()
-            rcode = mysql.mysqlMain(s, logger)
-        elif srv.srvname == 'rocketmq':
+        elif s['srvname'] == "redis":
+            redis = FabRedis.fabRedis(s, logger)
+            rcode = redis.redisMain()
+        elif s['srvname'] == "mysql":
+            mysql = FabMysql.fabMysql(s, logger)
+            rcode = mysql.mysqlMain()
+        elif s['srvname'] == 'rocketmq':
             rocketmq = FabRocketMq.fabRocketmq()
             rcode = rocketmq.rocketmqMain(s, logger)
-        elif srv.srvname == 'jdk':
-            rcode = FabSpring.jdkMain(s, logger)
-        elif srv.srvname == 'spring':
-            rcode = FabSpring.springinit(s, logger)
-        elif srv.srvname == 'nginx':
-            nginx = FabTengine.fabTengine()
-            rcode = nginx.tengineMain(s, logger)
-        elif srv.srvname == 'mongodb':
+        elif s['srvname'] == 'jdk':
+            rcode = FabApp.jdkMain(s, logger)
+        elif s['srvname'] == 'app':
+            rcode = FabApp.appinit(s, logger)
+        elif s['srvname'] == 'consul':
+            rcode = FabConsul.consulMain(s, logger)
+        elif s['srvname'] == 'nginx':
+            nginx = FabTengine.fabTengine(s, logger)
+            rcode = nginx.tengineMain()
+        elif s['srvname'] == 'mongodb':
             mongod = FabMongodb.fabMongodb()
             rcode = mongod.mongodbMain(s, logger)
-        elif srv.srvname == 'nacos':
+        elif s['srvname'] == 'nacos':
             nacos = FabNacos.fabNacos()
             rcode = nacos.nacosMain(s, logger)
-        elif srv.srvname == 'zookeeper':
+        elif s['srvname'] == 'zookeeper':
             zookeeper = FabZookeeper.fabZookeeper()
             rcode = zookeeper.zookeeperMain(s, logger)
         else:
-            raise "srvname not true"
+            raise "srvname not ture,please check it!"
     except Exception as e:
         logger.error(e)
         return False
@@ -104,7 +106,7 @@ def host_srv_check(host: Host):
         r = FabTengine.check_nginx(conn)
         result.append("Nginx: {}".format(r))
         # spring
-        r = FabSpring.check_spring(conn)
+        r = FabApp.check_spring(conn)
         result.append("Spring: {}".format(r))
         # rocketmq
         r = FabRocketMq.check_rocketmq(conn)

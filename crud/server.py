@@ -20,7 +20,7 @@ def save_server_info(servers: List[server.Server]):
             hostlist = []
             for host in s.host:
                 host_obj = db.query(Host).filter(Host.host == host.ip).first()
-                hostlist.append(ServerHost(host_id=host_obj.id, role=host.role))
+                hostlist.append(ServerHost(host_id=host_obj.id, role=host.role, appname=host.appname, tag=host.tag))
             s_obj.serverhost = hostlist
             db.add(s_obj)
         db.commit()
@@ -47,6 +47,8 @@ def get_serverinfo_by_id(srvid: int):
                                      user=host.hosts.user,
                                      password=host.hosts.password,
                                      role=host.role,
+                                     appname=host.appname,
+                                     tag=host.tag,
                                      sys_version=host.hosts.sys_version))
         srv = server.ServerInstall(id=s.id,
                                  srvname=s.srvname,
@@ -67,7 +69,7 @@ def get_all_server_info():
         for s in servers:
             hosts = []
             for host in s.serverhost:
-                hosts.append(server.HostBase(ip=host.hosts.host, role=host.role))
+                hosts.append(server.HostBase(ip=host.hosts.host, role=host.role, appname=host.appname, tag=host.tag))
             d = server.ServerRecord(id=s.id,
                                     srvname=s.srvname,
                                     mode=s.mode,

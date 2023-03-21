@@ -5,6 +5,8 @@ from typing import List, Any
 class HostBase(BaseModel):
     ip: str
     role: str
+    appname: str
+    tag: str
 
 
 class Host(HostBase):

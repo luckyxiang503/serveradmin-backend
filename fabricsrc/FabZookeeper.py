@@ -7,7 +7,7 @@ import datetime
 import os
 import fabric
 
-import FabSpring
+import FabApp
 import SimpleFunc
 from config import settings, zookeeperConf
 
@@ -20,6 +20,7 @@ class fabZookeeper():
         self.zkversion = self.pkgname.replace(".tar.gz", "")
         self.zkpath = zookeeperConf.zk_install_path
         self.msgFile = settings.serverMsgText
+        self.JAVAHOME = zookeeperConf.JAVAHOME
 
     def zookeeperMain(self, d, logger):
         self.pkgpath = os.path.join(self.pkgsdir, d['srvname'])
@@ -94,7 +95,7 @@ class fabZookeeper():
         n = []
         lst = []
         for host in hosts:
-            n.append(":2181".format(host['ip']))
+            n.append("{}:2181".format(host['ip']))
             k = {
                 'ip': host['ip'],
                 'id': m
@@ -167,16 +168,16 @@ class fabZookeeper():
             return 0
         logger.info("zookeeper not installed, start install...")
 
-        # java环境检查
-        logger.info("check java...")
-        r = conn.run("which java >/dev/null 2>&1 && java -version", warn=True, hide=True)
+        # 检查java环境
+        logger.info("check JAVA_HOME...")
+        r = conn.run("[ -d {0} ] && [ -f {0}/bin/java ]".format(self.JAVAHOME), hide=True, warn=True)
         if r.exited != 0:
-            logger.error("java is not install,please install it.")
-            rcode = FabSpring.jdkInstall(conn, logger)
+            logger.error("No JAVA_HOME,start install jdk...")
+            rcode = FabApp.jdkInstall(conn, logger)
             if rcode != None:
+                logger.info("jdk install faild!")
                 return 1
-        else:
-            logger.info("java installed.")
+        logger.info("java is installed.")
 
         # 拷贝文件到远程主机
         logger.info("copy package to remothost.")
@@ -185,12 +186,13 @@ class fabZookeeper():
             return 1
         conn.run("[ -d {0} ] && rm -rf {0}/*".format(self.remotepath), warn=True, hide=True)
         # 遍历目录文件并上传到服务器
+        logger.info("upload {} files to remote host...".format(self.pkgpath))
         for root, dirs, files in os.walk(self.pkgpath):
             rpath = root.replace(self.pkgpath, self.remotepath).replace('\\', '/')
             conn.run("mkdir -p {}".format(rpath))
             for file in files:
                 localfile = os.path.join(root, file)
-                logger.info("put file: {} to {}".format(localfile, rpath))
+                # logger.info("put file: {} to {}".format(localfile, rpath))
                 conn.put(localfile, rpath)
 
         # 安装
@@ -207,7 +209,7 @@ class fabZookeeper():
         logger.info("Add env PATH....")
         r = conn.run("grep '/opt/zookeeper/bin' /etc/profile", hide=True, warn=True)
         if r.exited != 0:
-            conn.run("echo \"export PATH=/opt/zookeeper/bin:$PATH\" >> /etc/profile")
+            conn.run("echo \"export PATH=\$PATH:/opt/zookeeper/bin\" >> /etc/profile")
 
 
 def check_zookeeper(conn):
