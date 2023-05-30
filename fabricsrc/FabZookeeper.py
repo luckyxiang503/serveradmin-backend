@@ -8,7 +8,7 @@ import os
 import fabric
 
 import FabApp
-import SimpleFunc
+import CommonFunc
 from config import settings, zookeeperConf
 
 
@@ -39,7 +39,7 @@ class fabZookeeper():
             return 1
 
     def zookeeperSingle(self, host, logger):
-        upasswd = SimpleFunc.createpasswd()
+        upasswd = CommonFunc.createpasswd()
 
         logger.info("=" * 40)
         logger.info("[{}] zookeeper install start......".format(host['ip']))
@@ -90,7 +90,7 @@ class fabZookeeper():
             f.write("系统用户: zookeeper, 密码: {}\n".format(upasswd))
 
     def zookeeperCluster(self, hosts, logger):
-        upasswd = SimpleFunc.createpasswd()
+        upasswd = CommonFunc.createpasswd()
         m = 1
         n = []
         lst = []

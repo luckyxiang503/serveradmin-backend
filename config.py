@@ -6,7 +6,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 class settings:
     # 数据库相关
-    dbhost = '192.168.10.100:13306'
+    dbhost = '192.168.22.30:13306'
     dbuser = 'root'
     dbpasswd = 'Hc_2023!'
     dbname = 'hcsadb'
@@ -65,13 +65,12 @@ class nginxConf:
     luajit_version = "LuaJIT-2.0.4"
     nginx_install_path = "/usr/local/nginx"
 
-
-class springConf:
-    jdkPkgName = "jdk-8u341-linux-x64.tar.gz"
-    jdkVersion = "jdk1.8.0_341"
+class appConf:
+    jdkPkgName = "jdk1.8.0_151.tar.gz"
+    jdkVersion = "jdk1.8.0_151"
+    rsyncVersion = "3.0.6"
     tomcatpkg = "apache-tomcat-8.5.51.tar.gz"
     pinpointpkg = "pinpoint-agent-2.3.3.tar.gz"
-
 
 class rocketmqConf:
     rocketmq_install_path = "/opt/rocketMQ"

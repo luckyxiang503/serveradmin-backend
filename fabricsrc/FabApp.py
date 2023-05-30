@@ -6,12 +6,12 @@
 import os
 import datetime
 import fabric
-import SimpleFunc
-from config import settings, springConf
+import CommonFunc
+from config import settings, appConf
 
 msgFile = settings.serverMsgText
-jdkPkgName = springConf.jdkPkgName
-jdkVersion = springConf.jdkVersion
+jdkPkgName = appConf.jdkPkgName
+jdkVersion = appConf.jdkVersion
 pkgsdir = settings.pkgsdir
 pkgpath = os.path.join(pkgsdir, "tools")
 remotepath = "/opt/pkgs/tools"
@@ -90,12 +90,13 @@ def jdkInstall(conn, logger):
 
 def appinit(d, logger):
     hosts = d['host']
-    tomcatpkg = springConf.tomcatpkg
+    rsyncVersion = appConf.rsyncVersion
+    tomcatpkg = appConf.tomcatpkg
     tomcatv = tomcatpkg.replace(".tar.gz", "")
-    pinpointpkg = springConf.pinpointpkg
+    pinpointpkg = appConf.pinpointpkg
     pinpointv = pinpointpkg.replace(".tar.gz", "")
     group = 'hcapp'
-    # l = []
+    userinfo = {}
 
     for host in hosts:
         users = host['appname'].split(',')
@@ -139,14 +140,14 @@ def appinit(d, logger):
                 conn.run("tar -xf {}/{} -C /usr/local/".format(remotepath, tomcatpkg), hide=True)
 
             # 创建用户和目录
-            userinfo = []
             for user in users:
-                upasswd = SimpleFunc.createpasswd()
+                if user not in userinfo:
+                    upasswd = CommonFunc.createpasswd()
+                    userinfo[user] = upasswd
                 logger.info("Create user {}...".format(user))
                 conn.run("groupadd {}".format(group), warn=True, hide=True)
                 conn.run("id -u {0} >/dev/null && usermod -g {1} {0} || useradd -g {1} {0}".format(user, group), warn=True, hide=True)
                 conn.run("echo '{}' | passwd --stdin {}".format(upasswd, user), warn=True, hide=True)
-                userinfo.append((user, upasswd))
 
                 # 解压pinpoint包
                 r = conn.run("[ -d /home/{0}/pinpoint ]".format(user), hide=True, warn=True)
@@ -154,22 +155,31 @@ def appinit(d, logger):
                     logger.info("tar xf {}".format(pinpointpkg))
                     conn.run("tar -xf {}/{} -C /home/{}".format(remotepath, pinpointpkg, user), hide=True, warn=True)
                     conn.run("mv /home/{0}/{1} /home/{0}/pinpoint".format(user, pinpointv), hide=True, warn=True)
-                    conn.run("cp {}/hip.sh /home/{}/".format(remotepath, user), hide=True, warn=True)
+                conn.run("cp {}/hip.sh /home/{}/".format(remotepath, user), hide=True, warn=True)
 
                 # 添加免密
-                ver36_keys = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDZ8NAezDqe+WjuKJN5SjkETska5NzSpVkZr9rRg+lzCw3x1WQfhIPOspqK6uwv2ZbXmg5oju0gRcBtc0iEzjeHOLyFmwdjJ2FnWGw+96jkDDS4itQ7kRIctwudCK3sX2E2MsPErVBzEB2EOpdypyelje1yhs5dUG/YPboSx8krJDnbQzRazYJ01vrR7tvP4SnHudyfxD+hyQDido5LAjsgUsYcPPPKpNiqBBDUJU+ZJT77zh9HXWHLzmr7vx30gv/d3Xzi27Z5yoJPORhBDFWVI7QKyFeOFxEZhw4lxedx30reCK8YpIDGkaPRsWtJGmCMTR2lIHJjgZZXeVjGPtlh ver@ver36.gzhc.local"
+                authorized_keys = '''ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCbsKEGsDlyJdkMujSTx0v+vE+1sbpXrxBCyEOKyvEGB9VPxRaJ0mCZd7TvzeBmtdUWj7hC0uF2na+Ei+6Qwsdqd5VU6LzrmeAZePHzf6WhS7vsOa/NFwMCI8WURIAzEvB7dE+WkCXxksOY0OLlRnlBuVmxXEzEPt/kcj92bNSgsVUrEgeoYV/Q8ITIZW1clxvsSwv71Svy6KRRlzKdUHPq2DcF+tTprUWup6ZPUB2y6+jvXXvzpbLimNKumdmLaNEKbpUjJE8KacYfX6BqLTb7dno/J/BkOPX/oP22+3nMgHQG35NnZ0XB0YuzPT10K8stnK33jllYtEIAnnal971J devops@Hcdevops
+                ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDZ8NAezDqe+WjuKJN5SjkETska5NzSpVkZr9rRg+lzCw3x1WQfhIPOspqK6uwv2ZbXmg5oju0gRcBtc0iEzjeHOLyFmwdjJ2FnWGw+96jkDDS4itQ7kRIctwudCK3sX2E2MsPErVBzEB2EOpdypyelje1yhs5dUG/YPboSx8krJDnbQzRazYJ01vrR7tvP4SnHudyfxD+hyQDido5LAjsgUsYcPPPKpNiqBBDUJU+ZJT77zh9HXWHLzmr7vx30gv/d3Xzi27Z5yoJPORhBDFWVI7QKyFeOFxEZhw4lxedx30reCK8YpIDGkaPRsWtJGmCMTR2lIHJjgZZXeVjGPtlh ver@ver36.gzhc.local'''
                 with conn.cd("/home/{}".format(user)):
                     conn.run("[ -d .ssh ] || mkdir .ssh", hide=True, warn=True)
                     conn.run("chown {}:{} .ssh && chmod 700 .ssh".format(user, group))
                     r = conn.run("[ -f .ssh/authorized_keys ] && grep 'ver@ver36.gzhc.local' .ssh/authorized_keys", hide=True, warn=True)
                     if r.exited != 0:
-                        conn.run("echo \"{}\" >> .ssh/authorized_keys".format(ver36_keys))
-                        conn.run("chown {}:{} .ssh/authorized_keys && chmod 600 .ssh".format(user, group))
+                        conn.run("echo \"{}\" >> .ssh/authorized_keys".format(authorized_keys))
+                    conn.run("chown {}:{} .ssh/authorized_keys && chmod 600 .ssh/authorized_keys".format(user, group))
 
                 logger.info("appname: {} init finished.".format(user))
 
             conn.run("mkdir -p /logs", warn=True, hide=True)
             conn.run("chown -R {0}:{1} /logs /home/{0} && chmod -R 775 /logs".format(users[0], group), warn=True, hide=True)
+
+            #安装rsync
+            r = conn.run("rsync --version | grep -E \"version +{}\"".format(rsyncVersion), warn=True, hide=True)
+            if r.exited != 0:
+                logger.info("rsync not installed.")
+                with conn.cd(remotepath):
+                    conn.run("tar -xf rsync-{}.tar.gz".format(rsyncVersion), warn=True, hide=True)
+                    conn.run("cd rsync-{} && ./configure && make -j 4 && make install".format(rsyncVersion), warn=True, hide=True)
 
         # 将服务信息写入文件
         with open(msgFile, 'a+', encoding='utf-8') as f:
@@ -177,8 +187,8 @@ def appinit(d, logger):
             f.write(">>>>>>>>>>>>>>>>>>>>>>>>> [{}] app init  <<<<<<<<<<<<<<<<<<<<<<<<<<<\n".format(host['ip']))
             f.write("time: {}\n".format(dtime))
             f.write("Host: {}\n".format(host['ip']))
-            for u in userinfo:
-                f.write("系统用户: {}, 密码： {}\n".format(u[0], u[1]))
+            for user, passwd in userinfo.items():
+                f.write("系统用户: {}, 密码： {}\n".format(user, passwd))
 
 
 def check_spring(conn):

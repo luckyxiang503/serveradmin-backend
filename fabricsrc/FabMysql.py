@@ -8,7 +8,7 @@ import os
 import re
 import fabric
 
-import SimpleFunc
+import CommonFunc
 from config import settings, mysqlConf
 
 
@@ -79,7 +79,7 @@ class fabMysql:
         conn.run("id mysql >/dev/null 2>&1 && usermod mysql -s /bin/bash || useradd mysql", warn=True, hide=True)
         conn.run("echo '{}' | passwd --stdin mysql".format(mysqlpwd), warn=True, hide=True)
         conn.run("[ -f /etc/my.cnf ] && mv -f /etc/my.cnf /etc/my.cnf_bak_`date +%F`", warn=True, hide=True)
-        txt = SimpleFunc.FillTemplate(self.tmplatepath, 'my.cnf', datadir=self.datadir, logdir=self.logdir, serverid=serverid)
+        txt = CommonFunc.FillTemplate(self.tmplatepath, 'my.cnf', datadir=self.datadir, logdir=self.logdir, serverid=serverid)
         conn.run("echo '{}' > /etc/my.cnf".format(txt))
         # 创建相关目录
         conn.run("mkdir -p {} {} /data/mysql/tmp /var/run/mysqld".format(self.logdir, self.datadir))
@@ -107,9 +107,9 @@ class fabMysql:
 
     def mysqlSingle(self, host):
         # 系统用户账号密码
-        mysqlpwd = SimpleFunc.createpasswd()
+        mysqlpwd = CommonFunc.createpasswd()
         # mysql用户账号密码
-        rootpwd = SimpleFunc.createpasswd()
+        rootpwd = CommonFunc.createpasswd()
 
         self.logger.debug("mysql root passwd: {}".format(rootpwd))
         self.logger.info("=" * 40)
@@ -136,8 +136,8 @@ class fabMysql:
             # 创建应用账号
             if self.env == "dev":
                 try:
-                    admpwd = SimpleFunc.createpasswd()
-                    apppwd = SimpleFunc.createpasswd()
+                    admpwd = CommonFunc.createpasswd()
+                    apppwd = CommonFunc.createpasswd()
                     conn.run("echo \"grant all on *.* to 'sqladm'@'192.168.%' identified by '{}';\" > /tmp/tmp.sql".format(admpwd))
                     conn.run("echo \"grant select,update,delete,insert on *.* to 'sqlapp'@'192.168.%' identified by '{}';\" >> /tmp/tmp.sql".format(apppwd))
                     conn.run("echo \"flush privileges;\" >> /tmp/tmp.sql")
@@ -166,10 +166,10 @@ class fabMysql:
 
     def mysql1M1S(self, hosts):
         # 系统用户密码
-        mysqlpwd = SimpleFunc.createpasswd()
+        mysqlpwd = CommonFunc.createpasswd()
         # mysql用户账号密码
-        rootpwd = SimpleFunc.createpasswd()
-        reppwd = SimpleFunc.createpasswd()
+        rootpwd = CommonFunc.createpasswd()
+        reppwd = CommonFunc.createpasswd()
 
         # 判断master与slave
         if hosts[0]['role'] == 'slave' and hosts[1]['role'] == 'master':
@@ -272,8 +272,8 @@ class fabMysql:
                                connect_kwargs={"password": hosts[0]['password']}, connect_timeout=10) as conn:
             if self.env == "dev":
                 try:
-                    admpwd = SimpleFunc.createpasswd()
-                    apppwd = SimpleFunc.createpasswd()
+                    admpwd = CommonFunc.createpasswd()
+                    apppwd = CommonFunc.createpasswd()
                     conn.run(
                         "echo \"grant all on *.* to 'sqladm'@'192.168.%' identified by '{}';\" > /tmp/tmp.sql".format(
                             admpwd))

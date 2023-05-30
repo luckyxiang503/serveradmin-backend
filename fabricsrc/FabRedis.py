@@ -6,7 +6,7 @@
 import os
 import datetime
 import fabric
-import SimpleFunc
+import CommonFunc
 
 from config import settings, redisConf
 
@@ -107,9 +107,9 @@ class fabRedis():
 
     def redisSingle(self, host):
         # 用户密码
-        redispwd = SimpleFunc.createpasswd()
+        redispwd = CommonFunc.createpasswd()
         # redis服务密码
-        spasswd = SimpleFunc.createpasswd(length=10)
+        spasswd = CommonFunc.createpasswd(length=10)
 
         # 连接远程机器
         self.logger.info("=" * 40)
@@ -139,13 +139,13 @@ class fabRedis():
             self.logger.info("copy redis.conf")
             conn.run("[ -f {0}/redis.conf ] && mv -f {0}/redis.conf {0}/redis.conf_bak_`date +%F`".format(self.confpath), warn=True, hide=True)
 
-            txt = SimpleFunc.FillTemplate(self.tmplatepath, 'redis_6379.conf', datapath=self.datapath, logpath=self.logpath, redispwd=spasswd)
+            txt = CommonFunc.FillTemplate(self.tmplatepath, 'redis_6379.conf', datapath=self.datapath, logpath=self.logpath, redispwd=spasswd)
             conn.run("echo '{}' > {}/redis.conf".format(txt, self.confpath), hide=True)
             conn.run("chown -R redis:redis {} {} {}".format(self.confpath, self.datapath, self.logpath))
 
             # 服务添加与启动
             self.logger.info(">>>>>>>>>>>>>>> starting redis server <<<<<<<<<<<<<<")
-            txt = SimpleFunc.FillTemplate(self.tmplatepath, 'redis-6379.service', redispath=self.redis_dir, confpath=self.confpath)
+            txt = CommonFunc.FillTemplate(self.tmplatepath, 'redis-6379.service', redispath=self.redis_dir, confpath=self.confpath)
             conn.run("echo '{}' > /lib/systemd/system/redis.service".format(txt), hide=True)
             conn.run("systemctl daemon-reload", hide=True)
             try:
@@ -167,8 +167,8 @@ class fabRedis():
             f.write("Redis 服务密码: {}\n".format(spasswd))
 
     def redisClusterOne(self, host):
-        redispwd = SimpleFunc.createpasswd()
-        spasswd = SimpleFunc.createpasswd()
+        redispwd = CommonFunc.createpasswd()
+        spasswd = CommonFunc.createpasswd()
 
         # 连接远程机器
         self.logger.info("=" * 40)
@@ -203,14 +203,14 @@ class fabRedis():
                 conn.run("mkdir -p {}".format(cpath), warn=True, hide=True)
                 self.logger.info("create redis.conf".format(cpath))
                 conn.run("[ -f {0}/redis.conf ] && mv -f {0}/redis.conf {0}/redis.conf_bak_`date +%F`".format(cpath), warn=True, hide=True)
-                txt = SimpleFunc.FillTemplate(self.tmplatepath, 'redis_cluster.conf', datapath=dpath, logpath=lpath, redispwd=spasswd, port=i)
+                txt = CommonFunc.FillTemplate(self.tmplatepath, 'redis_cluster.conf', datapath=dpath, logpath=lpath, redispwd=spasswd, port=i)
                 conn.run("echo '{}' > {}/redis.conf".format(txt, cpath), hide=True)
             conn.run("chown -R redis:redis {} {} {}".format(self.clulogpath, self.cluconfpath, self.cludatapath))
 
             # 服务添加与启动
             self.logger.info(">>>>>>>>>>>>>>> starting redis server <<<<<<<<<<<<<<")
             for i in range(7000, 7006):
-                txt = SimpleFunc.FillTemplate(self.tmplatepath, 'redis-cluster.service', redispath=self.redis_dir, confpath=self.confpath, port=i)
+                txt = CommonFunc.FillTemplate(self.tmplatepath, 'redis-cluster.service', redispath=self.redis_dir, confpath=self.cluconfpath, port=i)
                 conn.run("echo '{}' > /lib/systemd/system/redis-{}.service".format(txt, i), hide=True)
             conn.run("systemctl daemon-reload", hide=True)
             try:
@@ -243,8 +243,8 @@ class fabRedis():
             f.write("Redis 服务密码: {}\n".format(spasswd))
 
     def redisClusterThree(self, hosts):
-        spasswd = SimpleFunc.createpasswd(length=10)
-        redispwd = SimpleFunc.createpasswd(length=10)
+        spasswd = CommonFunc.createpasswd(length=10)
+        redispwd = CommonFunc.createpasswd(length=10)
 
         # 连接远程机器
         for host in hosts:
@@ -282,7 +282,7 @@ class fabRedis():
                     conn.run(
                         "[ -f {0}/redis.conf ] && mv -f {0}/redis.conf {0}/redis.conf_bak_`date +%F`".format(cpath),
                         warn=True, hide=True)
-                    txt = SimpleFunc.FillTemplate(self.tmplatepath, 'redis_cluster.conf', datapath=dpath, logpath=lpath,
+                    txt = CommonFunc.FillTemplate(self.tmplatepath, 'redis_cluster.conf', datapath=dpath, logpath=lpath,
                                                   redispwd=spasswd, port=i)
                     conn.run("echo '{}' > {}/redis.conf".format(txt, cpath), hide=True)
                 conn.run("chown -R redis:redis {} {} {}".format(self.clulogpath, self.cluconfpath, self.cludatapath))
@@ -290,8 +290,8 @@ class fabRedis():
                 # 服务添加与启动
                 self.logger.info(">>>>>>>>>>>>>>> starting redis server <<<<<<<<<<<<<<")
                 for i in range(7000, 7002):
-                    txt = SimpleFunc.FillTemplate(self.tmplatepath, 'redis-cluster.service', redispath=self.redis_dir,
-                                                  confpath=self.confpath, port=i)
+                    txt = CommonFunc.FillTemplate(self.tmplatepath, 'redis-cluster.service', redispath=self.redis_dir,
+                                                  confpath=self.cluconfpath, port=i)
                     conn.run("echo '{}' > /lib/systemd/system/redis-{}.service".format(txt, i), hide=True)
                 conn.run("systemctl daemon-reload", hide=True)
                 try:
@@ -327,8 +327,8 @@ class fabRedis():
             f.write("Redis 服务密码: {}\n".format(spasswd))
 
     def redisClusterSix(self, hosts):
-        spasswd = SimpleFunc.createpasswd(length=10)
-        redispwd = SimpleFunc.createpasswd(length=10)
+        spasswd = CommonFunc.createpasswd(length=10)
+        redispwd = CommonFunc.createpasswd(length=10)
 
         # 连接远程机器
         for host in hosts:
@@ -365,15 +365,15 @@ class fabRedis():
                 self.logger.info("copy redis.conf to {}/redis.conf".format(cpath))
                 conn.run("[ -f {0}/redis.conf ] && mv -f {0}/redis.conf {0}/redis.conf_bak_`date +%F`".format(cpath),
                     warn=True, hide=True)
-                txt = SimpleFunc.FillTemplate(self.tmplatepath, 'redis_cluster.conf', datapath=dpath, logpath=lpath,
+                txt = CommonFunc.FillTemplate(self.tmplatepath, 'redis_cluster.conf', datapath=dpath, logpath=lpath,
                                               redispwd=spasswd, port=port)
                 conn.run("echo '{}' > {}/redis.conf".format(txt, cpath), hide=True)
                 conn.run("chown -R redis:redis {} {} {}".format(self.clulogpath, self.cluconfpath, self.cludatapath))
 
                 # 服务添加与启动
                 self.logger.info(">>>>>>>>>>>>>>> starting redis server <<<<<<<<<<<<<<")
-                txt = SimpleFunc.FillTemplate(self.tmplatepath, 'redis-cluster.service', redispath=self.redis_dir,
-                                              confpath=self.confpath, port=port)
+                txt = CommonFunc.FillTemplate(self.tmplatepath, 'redis-cluster.service', redispath=self.redis_dir,
+                                              confpath=self.cluconfpath, port=port)
                 conn.run("echo '{}' > /lib/systemd/system/redis-{}.service".format(txt, port), hide=True)
                 conn.run("systemctl daemon-reload", hide=True)
                 try:

@@ -1,0 +1,5 @@
+server:
+-
+    srvname: base
+    host:
+        - ip=127.0.0.1 port=22 user=root password=123456

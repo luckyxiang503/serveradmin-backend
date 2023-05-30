@@ -149,7 +149,7 @@ def sysbaseline(conn, logger):
     logger.info("system passwd rules ......")
     conn.run("sed -i  's/^\(PASS_MAX_DAYS\).*/\\1   90/' /etc/login.defs", warn=True, hide=True)
     conn.run("sed -i   's/^\(PASS_MIN_DAYS\).*/\\1   3/'  /etc/login.defs", warn=True, hide=True)
-    conn.run("ssed -i  's/^\(PASS_MIN_LEN\).*/\\1   10/'  /etc/login.defs", warn=True, hide=True)
+    conn.run("sed -i  's/^\(PASS_MIN_LEN\).*/\\1   10/'  /etc/login.defs", warn=True, hide=True)
     conn.run("sed -i   's/^\(PASS_WARN_AGE\).*/\\1   10/'  /etc/login.defs", warn=True, hide=True)
     r = conn.run("grep \"^SU_WHEEL_ONLY\" /etc/login.defs", warn=True, hide=True)
     if r.exited != 0:
@@ -172,6 +172,16 @@ def sysbaseline(conn, logger):
         conn.run("echo \"*          hard    nofile     65535\" >> /etc/security/limits.conf", warn=True)
     logger.info("limit nofile finish.")
 
+    logger.info("locatime ......")
+    r = conn.run("ls /usr/share/zoneinfo/Asia/Shanghai", warn=True, hide=True)
+    if r.exited != 0:
+        conn.run("mv /etc/localtime /etc/localtime_bak`date +%F`".format(datetime.date), warn=True)
+        conn.run("ln -s /usr/share/zoneinfo/Asia/Shanghai /etc/localtime".format(datetime.date), warn=True)
+    
+    logger.info("ntpdate cron ......")
+    r = conn.run("crontab -l | grep ntpdate", warn=True, hide=True)
+    if r.exited != 0:
+        conn.run("echo \"1 2 * * * /usr/sbin/ntpdate -u ntp.aliyun.com\" >> /var/spool/cron/root")
 
 def createyumrepos(conn, logger):
     # 安装本地yum源

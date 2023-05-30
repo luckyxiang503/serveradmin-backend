@@ -7,7 +7,7 @@ import os
 import datetime
 
 import fabric
-import SimpleFunc, FabApp
+import CommonFunc, FabApp
 from config import settings, nacosConf
 
 
@@ -53,7 +53,7 @@ class fabNacos():
 
             # 创建用户
             logger.info("add user nacos...")
-            upasswd = SimpleFunc.createpasswd()
+            upasswd = CommonFunc.createpasswd()
             conn.run("id -u nacos >/dev/null 2>&1 || useradd nacos", warn=True, hide=True)
             conn.run("echo '{}' | passwd --stdin nacos".format(upasswd), warn=True, hide=True)
             conn.run("chown -R nacos:nacos {}".format(self.nacospath))
@@ -85,7 +85,7 @@ class fabNacos():
 
     def nacosCluster(self, hosts, logger):
         l = []
-        upasswd = SimpleFunc.createpasswd()
+        upasswd = CommonFunc.createpasswd()
         for host in hosts:
             l.append(host['ip'])
 

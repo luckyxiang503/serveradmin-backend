@@ -6,7 +6,7 @@
 import os
 import datetime
 import fabric
-import SimpleFunc
+import CommonFunc
 
 from config import settings, mongoConf
 
@@ -43,7 +43,7 @@ class fabMongodb:
             return 1
 
     def mongodbSingle(self, host, logger):
-        mongodpwd = SimpleFunc.createpasswd()
+        mongodpwd = CommonFunc.createpasswd()
 
         # 连接远程机器
         logger.info("=" * 40)
@@ -97,7 +97,7 @@ class fabMongodb:
             f.write("系统用户: mongod, 密码: {}\n".format(mongodpwd))
 
     def mongodbSharding(self, hosts, logger):
-        mongodpwd = SimpleFunc.createpasswd()
+        mongodpwd = CommonFunc.createpasswd()
 
         H, C = [], []
         for host in hosts:

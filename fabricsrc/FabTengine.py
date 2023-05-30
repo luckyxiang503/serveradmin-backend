@@ -7,7 +7,7 @@ import os
 import datetime
 import fabric
 
-import SimpleFunc
+import CommonFunc
 from config import settings, nginxConf
 
 
@@ -55,7 +55,7 @@ class fabTengine():
                 conn.run("mkdir -p /var/log/nginx && chown -R nginx:nginx /var/log/nginx", hide=True)
                 conn.run("chown -R nginx:nginx /usr/local/nginx", hide=True)
                 self.logger.info("create nginx.service...")
-                txt = SimpleFunc.FillTemplate(self.tmplatepath, 'nginx.service', nginxpath=self.nginxPath)
+                txt = CommonFunc.FillTemplate(self.tmplatepath, 'nginx.service', nginxpath=self.nginxPath)
                 conn.run("echo '{}' > /lib/systemd/system/nginx.service".format(txt), hide=True, warn=True)
 
                 # 启动nginx

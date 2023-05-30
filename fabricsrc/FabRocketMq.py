@@ -9,7 +9,7 @@ import time
 import fabric
 
 import FabApp
-import SimpleFunc
+import CommonFunc
 from config import settings, rocketmqConf
 
 
@@ -135,7 +135,7 @@ class fabRocketmq:
             # 创建用户和数据目录
             logger.info("create rocketmq user...")
             conn.run("id -u rocketmq >/dev/null 2>&1 || useradd rocketmq", warn=True, hide=True)
-            upasswd = SimpleFunc.createpasswd()
+            upasswd = CommonFunc.createpasswd()
             conn.run("echo '{}' | passwd --stdin rocketmq".format(upasswd), warn=True, hide=True)
             conn.run("[ -d {0} ] || mkdir -p {0}".format(self.datapath), warn=True, hide=True)
             conn.run("chown -R rocketmq:rocketmq {}".format(self.datapath), warn=True, hide=True)
@@ -177,7 +177,7 @@ class fabRocketmq:
             f.write("系统用户: rocketmq, 密码: {}\n".format(upasswd))
 
     def rocketmq1M2S(self, hosts, logger):
-        upasswd = SimpleFunc.createpasswd()
+        upasswd = CommonFunc.createpasswd()
         namesrvaddr = ""
         brokeraddr = ""
         dLegerPeer = ""

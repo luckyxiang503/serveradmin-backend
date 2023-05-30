@@ -5,7 +5,7 @@ from crud.host import get_hosts, update_host, delete_host, get_host_by_ip, add_h
 from schemas.host import Host, HostBase
 from schemas.base import Response200
 from core.security import get_current_user
-
+from core.host import conn_test
 
 host = APIRouter(tags=["主机相关"], dependencies=[Depends(get_current_user)])
 # host = APIRouter(tags=["主机相关"])
@@ -50,3 +50,10 @@ async def host_delete(host: str):
         if delete_host(host):
             return Response200(msg="主机删除成功")
     raise HTTPException(status_code=400, detail="主机删除失败")
+
+@host.post("/connhost", summary='测试连接', response_model=Response200)
+async def host_conn_test(host: Host):
+    if conn_test(host):
+        return Response200(msg="连接成功")
+    else:
+        raise HTTPException(status_code=400, detail="连接失败")

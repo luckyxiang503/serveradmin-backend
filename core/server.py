@@ -25,7 +25,7 @@ def install_server(srv: ServerInstall):
 
 
 def fabric_install(srv):
-    logger = SimpleFunc.FileLog(name="{}_{}".format(srv.srvname, srv.id), logfile=srv.logfile)
+    logger = CommonFunc.FileLog(name="{}_{}".format(srv.srvname, srv.id), logfile=srv.logfile)
     s = srv.dict()
     try:
         if s['srvname'] == 'base':
@@ -51,9 +51,9 @@ def fabric_install(srv):
         elif s['srvname'] == 'mongodb':
             mongod = FabMongodb.fabMongodb()
             rcode = mongod.mongodbMain(s, logger)
-        elif s['srvname'] == 'nacos':
-            nacos = FabNacos.fabNacos()
-            rcode = nacos.nacosMain(s, logger)
+        # elif s['srvname'] == 'nacos':
+        #     nacos = FabNacos.fabNacos()
+        #     rcode = nacos.nacosMain(s, logger)
         elif s['srvname'] == 'zookeeper':
             zookeeper = FabZookeeper.fabZookeeper()
             rcode = zookeeper.zookeeperMain(s, logger)
@@ -115,7 +115,7 @@ def host_srv_check(host: Host):
         r = FabZookeeper.check_zookeeper(conn)
         result.append("Zookeeper: {}".format(r))
         # nacos
-        r = FabNacos.check_nacos(conn)
-        result.append("Nacos: {}".format(r))
+        # r = FabNacos.check_nacos(conn)
+        # result.append("Nacos: {}".format(r))
 
         return result

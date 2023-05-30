@@ -5,7 +5,7 @@
 '''
 import time
 import fabric
-import SimpleFunc
+import CommonFunc
 
 
 class bcolors:

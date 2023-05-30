@@ -5,11 +5,12 @@ from typing import Optional
 from fastapi import HTTPException, Depends
 from passlib.context import CryptContext
 from starlette import status
+import secrets
 
-from config import settings
 from crud.user import get_user_by_name
 
-
+ALGORITHM = "HS256"
+SECRET_KEY = secrets.token_urlsafe(32)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -49,7 +50,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode.update({"exp": expire})
     # SECRET_KEY：密钥
     # ALGORITHM：JWT令牌签名算法
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 
@@ -66,7 +67,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception

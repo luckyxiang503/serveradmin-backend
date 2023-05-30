@@ -1,0 +1,82 @@
+server:
+-
+    srvname: base
+    host:
+        - ip=127.0.0.1 port=22 user=root password=123456
+-
+    srvname: redis
+    # 单机：redis-single 单机伪集群：redis-cluster-one 三节点集群：redis-cluster-three 六节点集群：redis-cluster-six
+    mode: 'redis-single'
+    host:
+        - ip=127.0.0.1 port=22 user=root password=123456
+-
+    srvname: mysql
+        # 单机 ：mysql-single 1主1从：mysql-1M1S
+    mode: 'mysql-1M1S'
+    host:
+        # mysql主从机器标识，master：主  slave: 从
+        - ip=127.0.0.1 port=22 user=root password=123456 role=master
+        - ip=127.0.0.1 port=22 user=root password=123456 role=slave
+-
+    srvname: rocketmq
+    mode: 'rocketmq-single' # 单机：rocketmq-single 1主2从集群：rocketmq-1M2S
+    host:
+        - ip=127.0.0.1 port=22 user=root password=123456
+
+-
+    srvname: jdk
+    host:
+        - ip=127.0.0.1 port=22 user=root password=123456
+-
+    srvname: app  # 初始化java环境和安装tomcat，创建应用账号
+    host:
+        - ip=127.0.0.1 port=22 user=root password=123456 appname=spring
+
+-
+    srvname: nginx
+    host:
+        - ip=127.0.0.1 port=22 user=root password=123456
+
+-
+    srvname: mongodb
+    # 单机：mongodb-single  分片集群：mongodb-sharding
+    mode: 'mongodb-single'
+    host:
+        - ip=127.0.0.1 port=22 user=root password=123456
+
+-
+    srvname: mongodb
+    mode: 'mongodb-sharding'
+    host:
+        - ip=127.0.0.1 port=22 user=root password=123456
+        - ip=192.168.11.15 port=22 user=root password=123456
+        - ip=192.168.11.16 port=22 user=root password=123456
+
+-
+    srvname: netdata
+    host:
+        - ip=127.0.0.1 port=22 user=root password=123456
+-
+    srvname: nacos
+    # 单机：nacos-single 集群：nacos-cluster
+    mode: "nacos-cluster"
+    host:
+        - ip=127.0.0.1 port=22 user=root password=123456
+        - ip=192.168.11.15 port=22 user=root password=123456
+        - ip=192.168.11.16 port=22 user=root password=123456
+
+-
+    srvname: zookeeper
+    # 单机：zookeeper-single 集群：zookeeper-cluster
+    mode: "zookeeper-single"
+    host:
+        - ip=127.0.0.1 port=22 user=root password=123456
+
+-
+    srvname: consul
+    # 服务端3节点集群：server  客服端：client
+    mode: client
+    join: ""
+    token: ""
+    host:
+        - ip=192.168.11.15 port=22 user=root password=123456 tag=redis&zk

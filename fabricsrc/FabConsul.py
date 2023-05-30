@@ -18,6 +18,8 @@ def consulMain(d, logger):
     hostnum = len(hosts)
     consulenv = d['consulEnv']
 
+    print("nacos需要先安装mysql，暂不支持！")
+    return 1
     if d['mode'] == 'server' and hostnum == 3:
         if install_server(hosts, logger) is not None:
             return 1
